@@ -19,7 +19,7 @@ Right now I have:
 - a stack-based bytecode (flat -- labels only exist as instruction pointers)
 - a really simple calling convention that will remind you of Prolog
 - pause/resume functionality (but you have to bring your own scheduler)
-- assignment (but no assignment syntax except for functional call syntax)
+- assignment (but no assignment syntax except for function call syntax, which binds vars)
 - parsing (with Nom)
 
 Things I'd need to add to consider this "usable":
