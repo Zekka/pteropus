@@ -38,6 +38,7 @@ Things I'd need to add to consider this "usable":
 Things on my Would Be Nice list:
 
 - a stack layout without the extra layer of indirection imposed by my frames/stack object
+- copy-on-write for vectors
 - unit test coverage
 - a good solution to the problem of how copying variably-sized terms is expensive
 - a language server
