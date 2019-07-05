@@ -1,0 +1,8 @@
+[package]
+name = "snapshots"
+version = "0.1.0"
+authors = ["Zekka <me@zekka.io>"]
+edition = "2018"
+
+[dependencies]
+nom = "5.*"
