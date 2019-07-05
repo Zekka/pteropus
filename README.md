@@ -4,7 +4,7 @@ Hey! I felt like doing some programming language stuff that wasn't super overamb
 
 This is definitely still a little hacky (because doing things right takes a lot of time and isn't fun) but not in ways that make it prone to falling over in a stiff breeze.
 
-Your only hope of understanding what's going on is to read the code, because this project is functionally useless and real hacky. There's probably a demo of whatever I was testing sitting in main.rs. 
+Your only hope of understanding what's going on is to read the code, because this project is functionally useless and real undocumented. There's probably a demo of whatever I was testing sitting in main.rs. 
 
 Goals are:
 
@@ -24,6 +24,7 @@ Right now I have:
 
 Things I'd need to add to consider this "usable":
 
+- more statement types
 - an ffi to rust (should be easy)
 - a store that lasts between function invocations
 - a proper tracer, pref. with an interactive debugger
