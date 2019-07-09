@@ -18,6 +18,10 @@ mod vm;
 fn main() {
     let parsed = parser::parse_module(r##"
     fn main() {
+        if let scott(@alpha, beta) = scott(alpha, delta) {
+
+        }
+        let @alpha = beta.
         let @no = no.
         if let yes = @no {
             ret 0.

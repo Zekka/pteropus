@@ -6,6 +6,7 @@ use errors::{Error, Runtime};
 
 use crate::prim::Functor;
 
+use bit_set::BitSet;
 use std::collections::btree_set::BTreeSet;
 use std::iter::FromIterator;
 
@@ -31,9 +32,10 @@ struct StackFrame<'a> {
     stack: Vec<Value>,
 
     mark: Option<MarkRegister>,
+    touched: BitSet,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct MarkRegister {
     stack_size: usize,
     ip: usize,
@@ -107,6 +109,7 @@ impl<'a> Running<'a> {
             vars: Vec::with_capacity(code.vars),
             stack: vec![call],
             mark: None,
+            touched: BitSet::with_capacity(code.vars),
         };
 
         for _ in 0..code.vars {
@@ -127,7 +130,7 @@ impl<'a> Running<'a> {
         self.frames[sp].ip += 1;
 
         use Instruction::*;
-        println!("- {:?} {:?}", self.frames[sp].code.instructions[ip], self.frames[sp].stack);
+        println!("- {:?} {:?} {:?}", self.frames[sp].code.instructions[ip], self.frames[sp].stack, self.frames[sp].touched);
         match self.frames[sp].code.instructions[ip].clone() {
             Push(Operand::Integer(i)) => {
                 self.frames[sp].stack.push(Value::Integer(i));
@@ -157,6 +160,7 @@ impl<'a> Running<'a> {
                 let to_push = match &self.frames[sp].vars[vp] {
                     None => { 
                         self.frames[sp].vars[vp] = Some(s1);
+                        self.frames[sp].touched.insert(vp);
                         true
                     }
                     Some(x) => {
@@ -164,6 +168,7 @@ impl<'a> Running<'a> {
                     }
                 };
                 self.frames[sp].stack.push(Value::Bool(to_push));
+                
                 Ok(VM::Running(self))
             }
             Get(vp) => {
@@ -236,6 +241,7 @@ impl<'a> Running<'a> {
                     }
                     Some(_) => { return Err(Error::CantMarkTwice); }
                 };
+                self.frames[sp].touched.clear();
                 Ok(VM::Running(self))
             }
 
@@ -248,7 +254,8 @@ impl<'a> Running<'a> {
                         if self.frames[sp].stack.len() != mk.stack_size {
                             return Err(Error::UnmarkWrongStackSize);
                         }
-                        self.frames[sp].mark = None
+                        self.frames[sp].mark = None;
+                        self.frames[sp].touched.clear();
                     }
                 };
                 Ok(VM::Running(self))
@@ -263,12 +270,23 @@ impl<'a> Running<'a> {
                 match s1 {
                     Value::Bool(true) => {},
                     Value::Bool(false) => { 
-                        self.frames[sp].ip = mk.ip;
                         if self.frames[sp].stack.len() < mk.stack_size {
                             return Err(Error::UnwindStackTooSmall);
                         }
+
+                        // jump to new address
+                        self.frames[sp].ip = mk.ip;
+
+                        // rewind to previous state
                         self.frames[sp].stack.drain(mk.stack_size..);
+                        let frame = &mut self.frames[sp];
+                        for vp in frame.touched.iter() {
+                            frame.vars[vp] = None;
+                        }
+
+                        // done rewinding!
                         self.frames[sp].mark = None;
+                        self.frames[sp].touched.clear();
                     }
                     _ => return Err(Error::ConditionalWrongType)
                 };
