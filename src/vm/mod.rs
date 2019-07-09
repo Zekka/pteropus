@@ -18,7 +18,7 @@ pub enum VM<'a> {
 }
 
 #[derive(Debug)]
-struct Running<'a> {
+pub struct Running<'a> {
     code: &'a Module,
     frames: Vec<StackFrame<'a>>
 }
@@ -29,6 +29,14 @@ struct StackFrame<'a> {
     ip: usize,
     vars: Vec<Option<Value>>,
     stack: Vec<Value>,
+
+    mark: Option<MarkRegister>,
+}
+
+#[derive(Copy, Clone, Debug)]
+struct MarkRegister {
+    stack_size: usize,
+    ip: usize,
 }
 
 // TODO: Factor out Clone when possible (can't get rid of it completely, probably)
@@ -98,6 +106,7 @@ impl<'a> Running<'a> {
             ip: 0,
             vars: Vec::with_capacity(code.vars),
             stack: vec![call],
+            mark: None,
         };
 
         for _ in 0..code.vars {
@@ -218,6 +227,52 @@ impl<'a> Running<'a> {
                         Ok(VM::Running(self))
                     }
                 }
+            }
+
+            Mark(l) => {
+                match self.frames[sp].mark {
+                    None => {
+                        self.frames[sp].mark = Some(MarkRegister { stack_size: self.frames[sp].stack.len(), ip: l })
+                    }
+                    Some(_) => { return Err(Error::CantMarkTwice); }
+                };
+                Ok(VM::Running(self))
+            }
+
+            Unmark => {
+                match self.frames[sp].mark {
+                    None => {
+                        return Err(Error::UnmarkMustBeMarked);
+                    }
+                    Some(mk) => { 
+                        if self.frames[sp].stack.len() != mk.stack_size {
+                            return Err(Error::UnmarkWrongStackSize);
+                        }
+                        self.frames[sp].mark = None
+                    }
+                };
+                Ok(VM::Running(self))
+            }
+
+            UnwindNo => {
+                let s1 = pop(&mut self.frames[sp].stack)?;
+                let mk = match self.frames[sp].mark {
+                    None => { return Err(Error::UnwindMustBeMarked); }
+                    Some(mk) => mk,
+                };
+                match s1 {
+                    Value::Bool(true) => {},
+                    Value::Bool(false) => { 
+                        self.frames[sp].ip = mk.ip;
+                        if self.frames[sp].stack.len() < mk.stack_size {
+                            return Err(Error::UnwindStackTooSmall);
+                        }
+                        self.frames[sp].stack.drain(mk.stack_size..);
+                        self.frames[sp].mark = None;
+                    }
+                    _ => return Err(Error::ConditionalWrongType)
+                };
+                Ok(VM::Running(self))
             }
 
             Destruct(sz) => {

@@ -15,4 +15,10 @@ pub enum Error {
 
     NoSuchProcedure, // for calls to a nonexistent procedure
     CallNotCompound, // a procedure name is a functor, so only compounds are callable
+
+    CantMarkTwice, // for code that tries to mark more than once at the same time on the same frame
+    UnmarkMustBeMarked, // for code that unmarks while not marked
+    UnmarkWrongStackSize, // for code that unmarks with the wrong number of stack items (not the same number as when marked)
+    UnwindMustBeMarked, // for code that unwinds while not marked
+    UnwindStackTooSmall, // for code that unwinds when there are less stack elements than it started with
 }

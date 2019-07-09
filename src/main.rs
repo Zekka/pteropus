@@ -18,16 +18,27 @@ mod vm;
 fn main() {
     let parsed = parser::parse_module(r##"
     fn main() {
-        ret v[call fib(0), call fib(1), call fib(2), call fib(3), call fib(4), call fib(5), call fib(6), call fib(7)].
-    }
-
-    fn fib(@x) {
-        if @x < 2 {
+        let @no = no.
+        if let yes = @no {
+            ret 0.
+        }
+        else if let yes(bro) = yes(brah) {
             ret 1.
         }
-        ret call fib(@x - 1) + call fib(@x - 2).
+        else if let yes(@dude) = yes(dude) {
+            if let @dude = bro {
+                ret 2.
+            } 
+            else if let @dude = dude {
+                ret r(3, @dude).
+            }
+            ret 4.
+        } 
+        else {
+            ret 5.
+        }
     }
-    "##);
+    "##); // should return r(3, dude)!!!!
 
     let compiled = parsed.unwrap().compile();
 

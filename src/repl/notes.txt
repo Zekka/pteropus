@@ -1,0 +1,5 @@
+Plans:
+
+- The repl has its own stack frame, represented as a hashtable.
+- The repl compiles each statement in isolation, then prepares a stack frame that includes the needed values, moved or copied from the repl's stack frame.
+- The repl then runs the code and copies the relevant values back out into its stack frame.

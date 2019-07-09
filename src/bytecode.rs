@@ -48,6 +48,9 @@ pub enum Instruction<TLoc, TLab, TInt> {
     ConstructVector(usize),
     ConstructSet(usize),
 
+    // Destructuring error handling
+    Mark(TLab), Unmark, UnwindNo,
+
     // Binop stuff
     Mul, Div,
     Add, Subtract,

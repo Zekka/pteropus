@@ -9,6 +9,21 @@ use nom::{
 use std::str::FromStr;
 use super::*;
 
+pub fn condition(inp: &str) -> IResult<&str, Condition, Error> {
+    alt((
+        condition_let,
+        |inp| expression(inp).map(|(i, o)| (i, Condition::Bare(o))),
+    ))(inp)
+}
+
+fn condition_let(inp: &str) -> IResult<&str, Condition, Error> {
+    let (inp, _) = lexeme_ws(tag("let"))(inp)?;
+    let (inp, pat) = pattern(inp)?;
+    let (inp, _) = lexeme(tag("="))(inp)?;
+    let (inp, expr) = expression(inp)?;
+    Ok((inp, Condition::Let(pat, expr)))
+}
+
 pub fn expression(inp: &str) -> IResult<&str, Expression, Error> {
     let (mut inp, mut lhs) = expression_leaf(inp)?;
     loop {

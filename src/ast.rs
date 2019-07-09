@@ -1,5 +1,3 @@
-use crate::prim::Functor;
-
 #[derive(Debug)]
 pub struct Module {
     pub procedures: Vec<Procedure>,
@@ -17,7 +15,7 @@ pub struct Procedure {
 
 #[derive(Debug)]
 pub enum Statement {
-    If(Expression, Block, Option<Block>),
+    If(Condition, Block, Option<Block>),
     Destructure(Pattern, Expression),
     Ret(Expression),
 }
@@ -46,6 +44,12 @@ pub enum Pattern {
     Compound(String, Vec<Pattern>),
     WcCompound(Vec<Pattern>), // wildcard head 
     Vector(Vec<Pattern>),
+}
+
+#[derive(Debug)]
+pub enum Condition {
+    Let(Pattern, Expression), 
+    Bare(Expression),
 }
 
 #[derive(Debug)]
@@ -98,7 +102,7 @@ impl BinOp {
 
     pub fn tighter(self, other: BinOp) -> bool {
         let (prec_1, assoc_1) = self.precedence();
-        let (prec_2, assoc_2) = other.precedence();
+        let (prec_2, _assoc_2) = other.precedence();
         // it's assumed (and unchecked) that if prec_1 == prec_2, assoc_1 == assoc_2
 
         if prec_1 < prec_2 { return true }

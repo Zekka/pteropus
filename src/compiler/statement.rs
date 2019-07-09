@@ -14,8 +14,7 @@ impl Statement {
                 let lb_else = pp.create_label();
                 let lb_done = pp.create_label();
 
-                cond.compile(pp, it);
-                pp.push(JumpNo(lb_else));
+                cond.compile(pp, it, lb_else);
 
                 pp.anchor_label(lb_then)?;
                 bl_then.compile(pp, it)?;
@@ -35,7 +34,7 @@ impl Statement {
             }
             Statement::Destructure(lhs, rhs) => {
                 rhs.compile(pp, it);
-                lhs.compile_destructure(pp, it);
+                lhs.compile_destructure(pp, it, false); // don't unwind on fail, since we aren't in a conditional situation
             }
             Statement::Ret(expression) => {
                 expression.compile(pp, it);

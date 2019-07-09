@@ -6,6 +6,23 @@ use super::phases::{PreInterns, PreProcedure};
 
 use Instruction::*;
 
+impl Condition {
+    pub fn compile(self, pp: &mut PreProcedure, it: &mut PreInterns, lb_else: LabelIx) {
+        match self {
+            Condition::Let(lhs, rhs) => {
+                pp.push(Mark(lb_else));
+                rhs.compile(pp, it);
+                lhs.compile_destructure(pp, it, true); // unwind on fail, since we are in a conditional situation
+                pp.push(Unmark);
+            }
+            Condition::Bare(xp) => {
+                xp.compile(pp, it);
+                pp.push(JumpNo(lb_else));
+            }
+        }
+    }
+}
+
 impl Expression {
     pub fn compile(self, pp: &mut PreProcedure, it: &mut PreInterns) {
         use Expression::*;

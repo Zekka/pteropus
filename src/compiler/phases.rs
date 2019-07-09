@@ -94,6 +94,13 @@ impl PreProcedure {
                 ConstructVector(s) => ConstructVector(s),
                 ConstructSet(s) => ConstructSet(s),
 
+                Mark(l) => Mark(
+                    if let Some(anc) = self.anchor_labels.get(&l) { *anc } 
+                    else { return Err(Error::NotAnchored(l.0)) }
+                ), 
+                Unmark => Unmark, 
+                UnwindNo => UnwindNo,
+
                 Mul => Mul, Div => Div,
                 Add => Add, Subtract => Subtract,
 
