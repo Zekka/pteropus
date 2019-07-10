@@ -75,6 +75,7 @@ impl PreProcedure {
                 Push(op) => Push(op),
                 Equals => Equals,
                 Assert => Assert,
+                Set(loc) => Set(loc.0),
                 SetOr(loc) => SetOr(loc.0),
                 Get(loc) => Get(loc.0),
                 Jump(l) => Jump(

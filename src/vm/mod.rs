@@ -164,6 +164,12 @@ impl<'a> Running<'a> {
                 }
                 Ok(VM::Running(self))
             }
+            Set(vp) => {
+                let s1 = pop(&mut self.frames[sp].stack)?;
+                self.frames[sp].vars[vp] = Some(s1);
+                self.frames[sp].touched.insert(vp);
+                Ok(VM::Running(self))
+            }
             SetOr(vp) => {
                 let s1 = pop(&mut self.frames[sp].stack)?;
                 let to_push = match &self.frames[sp].vars[vp] {

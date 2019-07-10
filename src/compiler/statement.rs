@@ -48,6 +48,11 @@ impl Statement {
 
                 pp.anchor_label(lb_done)?;
             }
+            Statement::Assign(lhs, rhs) => {
+                rhs.compile(pp, it);
+                let ix = pp.local(&lhs);
+                pp.push(Set(ix));
+            }
             Statement::Destructure(lhs, rhs) => {
                 rhs.compile(pp, it);
                 lhs.compile_destructure(pp, it, false); // don't unwind on fail, since we aren't in a conditional situation

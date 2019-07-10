@@ -16,6 +16,7 @@ pub struct Procedure {
 #[derive(Debug)]
 pub enum Statement {
     If(Condition, Block, Option<Block>),
+    Assign(String, Expression),
     Destructure(Pattern, Expression),
     Ret(Expression),
 }

@@ -8,7 +8,19 @@ use nom::{
 use super::*;
 
 pub fn statement(inp: &str) -> IResult<&str, Statement, Error> {
-    alt((statement_let, statement_if, statement_ret))(inp)
+    alt((statement_let, statement_now, statement_if, statement_ret))(inp)
+}
+
+fn statement_now(inp: &str) -> IResult<&str, Statement, Error> {
+    let (inp, _) = lexeme_ws(tag("now"))(inp)?;
+    cut(|inp| {
+        let (inp, pat) = var(inp)?;
+        let (inp, _) = lexeme(tag("="))(inp)?;
+        let (inp, expr) = expression(inp)?;
+        let (inp, _) = lexeme(tag("."))(inp)?;
+
+        Ok((inp, Statement::Assign(pat, expr)))
+    })(inp)
 }
 
 fn statement_let(inp: &str) -> IResult<&str, Statement, Error> {

@@ -16,6 +16,8 @@ pub enum Instruction<TLoc, TLab, TInt> {
     Equals, 
     // fail if s1 != true 
     Assert, 
+    // *s1 = s2, no matter what
+    Set(TLoc), 
     // *s1 = s2; push false if s1 is set and != s2, otherwise push true
     SetOr(TLoc), 
     // *s1
