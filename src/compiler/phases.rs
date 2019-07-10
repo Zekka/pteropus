@@ -11,7 +11,7 @@ pub struct PreProcedure {
     instructions: Vec<IxInstruction>,
     anchor_labels: HashMap<LabelIx, usize>,
     next_label: LabelIx,
-    local_name_to_ix: HashMap<String, LocalIx>,
+    pub local_name_to_ix: HashMap<String, LocalIx>,
     next_local: LocalIx,
 }
 
@@ -124,6 +124,15 @@ impl PreInterns {
             string: vec![],
         }
     }
+
+    pub fn extend(module: &crate::executable::Module) -> PreInterns {
+        // TODO: Don't clone these -- instead provide an alt PreInterns-y type that takes a ref
+        PreInterns {
+            intern: module.interns.intern.clone(),
+            string: module.interns.string.clone(),
+        }
+    }
+
     pub fn to_intern(&mut self, s: &str) -> InternIx {
         match self.intern.get(s) {
             Some(i) => { return InternIx(*i); }

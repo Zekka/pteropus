@@ -13,6 +13,7 @@ mod dbgdump;
 mod executable;
 mod parser;
 mod prim;
+mod repl;
 mod vm;
 
 fn main() {
@@ -48,6 +49,10 @@ fn main() {
 
     let ready_to_run = compiled.unwrap();
 
+    println!("Code: {}", ready_to_run.dump());
+    repl::repl_main(&ready_to_run);
+
+    /*
     let mut runtime = vm::VM::go(
         &ready_to_run, 
         vm::Value::Compound(ready_to_run.to_intern("main").unwrap(), vec![])
@@ -58,4 +63,5 @@ fn main() {
     }
 
     println!("Final state: {:?}", runtime);
+    */
 }

@@ -14,21 +14,21 @@ use std::iter::FromIterator;
 pub enum VM<'a> {
     Updating,
     Running(Running<'a>),
-    Succeeded(Value),
+    Succeeded(Value, Vec<Option<Value>>), // keep the vars from the frame, to extract in the repl
     Failed(Error),
 }
 
 #[derive(Debug)]
 pub struct Running<'a> {
-    code: &'a Module,
-    frames: Vec<StackFrame<'a>>
+    pub code: &'a Module,
+    pub frames: Vec<StackFrame<'a>>
 }
 
 #[derive(Debug)]
-struct StackFrame<'a> {
+pub struct StackFrame<'a> {
     code: &'a Procedure,
     ip: usize,
-    vars: Vec<Option<Value>>,
+    pub vars: Vec<Option<Value>>,
     stack: Vec<Value>,
 
     mark: Option<MarkRegister>,
@@ -74,7 +74,7 @@ impl<'a> VM<'a> {
                     Ok(v) => { v }
                 }
             }
-            VM::Succeeded(succeeded) => { VM::Succeeded(succeeded) }
+            VM::Succeeded(succeeded, vars) => { VM::Succeeded(succeeded, vars) }
             VM::Failed(failed) => { VM::Failed(failed) }
         }
     }
@@ -84,6 +84,25 @@ impl<'a> VM<'a> {
             VM::Running(_) => { true }
             _ => { false }
         }
+    }
+}
+
+impl<'a> StackFrame<'a> {
+    pub fn new_on(code: &'a Procedure) -> StackFrame<'a> {
+        let mut frame = StackFrame {
+            code: code,
+            ip: 0,
+            vars: Vec::with_capacity(code.vars),
+            stack: vec![],
+            mark: None,
+            touched: BitSet::with_capacity(code.vars),
+        };
+
+        for _ in 0..code.vars {
+            frame.vars.push(None);
+        };
+
+        return frame
     }
 }
 
@@ -103,18 +122,8 @@ impl<'a> Running<'a> {
             }
         };
 
-        let mut frame = StackFrame {
-            code: code,
-            ip: 0,
-            vars: Vec::with_capacity(code.vars),
-            stack: vec![call],
-            mark: None,
-            touched: BitSet::with_capacity(code.vars),
-        };
-
-        for _ in 0..code.vars {
-            frame.vars.push(None);
-        }
+        let mut frame = StackFrame::new_on(code);
+        frame.stack.push(call);
 
         self.frames.push(frame);
         Ok(VM::Running(self))
@@ -196,12 +205,12 @@ impl<'a> Running<'a> {
             }
             Ret => {
                 let rval = pop(&mut self.frames[sp].stack)?;
+                let top = self.frames.pop();
 
-                if self.frames.len() == 1 {
-                    return Ok(VM::Succeeded(rval));
+                if self.frames.len() == 0 {
+                    return Ok(VM::Succeeded(rval, top.unwrap().vars));
                 }
                 self.frames[sp - 1].stack.push(rval);
-                self.frames.pop();
                 Ok(VM::Running(self))
             }
             Call => {
