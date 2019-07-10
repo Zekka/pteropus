@@ -1,5 +1,6 @@
 use nom::{
     IResult, 
+    branch::alt,
     combinator::cut,
     bytes::complete::tag,
     multi,
@@ -16,7 +17,10 @@ pub fn procedure(inp: &str) -> IResult<&str, crate::ast::Procedure, Error> {
     let (inp, _) = lexeme_ws(tag("fn"))(inp)?;
     return cut(|inp| {
         let (inp, identifier) = identifier(inp)?;
-        let (inp, args) = surrounded("(", ")", multi::separated_list(lexeme(tag(",")), pattern))(inp)?;
+        let (inp, args) = alt((
+            surrounded("(", ")", multi::separated_nonempty_list(lexeme(tag(",")), pattern)),
+            |inp| Ok((inp, vec![])),
+        ))(inp)?;
         let (inp, body) = block(inp)?;
         Ok((inp, Procedure {
             name: identifier,

@@ -18,7 +18,7 @@ mod vm;
 
 fn main() {
     let parsed = parser::parse_module(r##"
-    fn main() {
+    fn main {
         if let scott(@alpha, beta) = scott(alpha, delta) {
 
         }
