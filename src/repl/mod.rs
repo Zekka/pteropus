@@ -5,6 +5,11 @@ use std::collections::HashMap;
 use std::io;
 use std::io::Write;
 
+// TODO: When things are in scope, don't reuse interns.
+// >>> let @wordA = helloworld.
+// >>> let @wordB = harvoworld.
+// >>> eval call print(w(@wordA, @wordB)).
+// #20(#20, #20)
 pub fn repl_main(loaded: &executable::Module) {
     let mut scope = HashMap::new();
 
