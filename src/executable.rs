@@ -1,11 +1,28 @@
 use std::collections::HashMap;
 use super::bytecode::RawInstruction;
 use crate::prim::Functor;
+use crate::vm::Value;
+
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Module {
     pub interns: Interns,
-    pub procedures: HashMap<Functor<usize>, Procedure>,
+    pub procedures: HashMap<Functor<usize>, FFIProcedure>,
+}
+
+pub enum FFIProcedure {
+    Native(Box<Fn(&Module, Value) -> Value>),
+    Dynamic(Procedure),
+}
+
+impl fmt::Debug for FFIProcedure {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FFIProcedure::Native(_) => { write!(f, "Native(:native code:)") }
+            FFIProcedure::Dynamic(p) => { write!(f, "Dynapic({:?})", p) }
+        }
+    }
 }
 
 #[derive(Debug)]

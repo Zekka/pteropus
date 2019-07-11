@@ -86,6 +86,7 @@ impl PreProcedure {
                     if let Some(anc) = self.anchor_labels.get(&l) { *anc } 
                     else { return Err(Error::NotAnchored(l.0)) }
                 ),
+                Pop => Pop,
                 Ret => Ret,
                 Call => Call,
                 IsVec => IsVec,

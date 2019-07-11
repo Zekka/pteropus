@@ -11,6 +11,7 @@ mod bytecode;
 mod compiler;
 mod dbgdump;
 mod executable;
+mod library;
 mod parser;
 mod prim;
 mod repl;
@@ -22,6 +23,8 @@ fn main() {
         if let scott(@alpha, beta) = scott(alpha, delta) {
 
         }
+        eval call print(got(past, first, conditional)).
+
         let @alpha = beta.
         let @no = no.
         if let yes = @no {
@@ -45,7 +48,7 @@ fn main() {
     }
     "##); // should return r(3, dude)!!!!
 
-    let compiled = parsed.unwrap().compile();
+    let compiled = parsed.unwrap().compile(library::Standard);
 
     let ready_to_run = compiled.unwrap();
 

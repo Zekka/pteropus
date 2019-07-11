@@ -1,7 +1,7 @@
 mod errors;
 
 use crate::bytecode::{Instruction, Operand};
-use crate::executable::{Module, Procedure};
+use crate::executable::{FFIProcedure, Module, Procedure};
 use errors::{Error, Runtime};
 
 use crate::prim::Functor;
@@ -114,7 +114,12 @@ impl<'a> Running<'a> {
                 // Replace it later!
                 match self.code.procedures.get(&Functor(*intern, args.len())) {
                     None => { return Err(Error::NoSuchProcedure); }
-                    Some(code) => code
+                    Some(FFIProcedure::Dynamic(code)) => { code }
+                    Some(FFIProcedure::Native(native)) => {
+                        let sp = self.frames.len() - 1;
+                        self.frames[sp].stack.push(native(&self.code, call));
+                        return Ok(VM::Running(self));
+                    }
                 }
             }
             _ => {
@@ -139,7 +144,7 @@ impl<'a> Running<'a> {
         self.frames[sp].ip += 1;
 
         use Instruction::*;
-        println!("- {:?} {:?} {:?}", self.frames[sp].code.instructions[ip], self.frames[sp].stack, self.frames[sp].touched);
+        // eprintln!("- {:?} {:?} {:?}", self.frames[sp].code.instructions[ip], self.frames[sp].stack, self.frames[sp].touched);
         match self.frames[sp].code.instructions[ip].clone() {
             Push(Operand::Integer(i)) => {
                 self.frames[sp].stack.push(Value::Integer(i));
@@ -207,6 +212,10 @@ impl<'a> Running<'a> {
                     }
                     _ => return Err(Error::ConditionalWrongType)
                 };
+                Ok(VM::Running(self))
+            }
+            Pop => {
+                let _ = pop(&mut self.frames[sp].stack)?;
                 Ok(VM::Running(self))
             }
             Ret => {

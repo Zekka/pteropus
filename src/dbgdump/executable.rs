@@ -1,5 +1,5 @@
 use crate::bytecode::RawInstruction;
-use crate::executable::{Module, Procedure};
+use crate::executable::{FFIProcedure, Module, Procedure};
 
 impl Module {
     pub fn dump(&self) -> String {
@@ -7,6 +7,15 @@ impl Module {
         let mut all = self.procedures.iter().collect::<Vec<_>>();
         all.sort_by(|(k1, _), (k2, _)| k1.partial_cmp(k2).unwrap());
         all.iter().map(|(_, v)| v.dump()).collect::<Vec<String>>().join("\n\n")
+    }
+}
+
+impl FFIProcedure {
+    pub fn dump(&self) -> String {
+        match self {
+            FFIProcedure::Dynamic(d) => { d.dump() }
+            _ => { ":native code:".to_owned() }
+        }
     }
 }
 

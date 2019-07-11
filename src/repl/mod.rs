@@ -16,7 +16,7 @@ pub fn repl_main(loaded: &executable::Module) {
 
         let parsed = parse_repl_statement(&inp).unwrap();
         let (vars, code) = parsed.compile_repl(loaded).unwrap();
-        println!("Vars, code: {:?}", (&vars, &code));
+        // println!("Vars, code: {:?}", (&vars, &code));
 
         let mut start = crate::vm::Running {
             code: loaded,

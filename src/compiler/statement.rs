@@ -57,6 +57,10 @@ impl Statement {
                 rhs.compile(pp, it);
                 lhs.compile_destructure(pp, it, false); // don't unwind on fail, since we aren't in a conditional situation
             }
+            Statement::Eval(expression) => {
+                expression.compile(pp, it);
+                pp.push(Pop);
+            }
             Statement::Ret(expression) => {
                 expression.compile(pp, it);
                 pp.push(Ret);

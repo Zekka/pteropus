@@ -1,11 +1,8 @@
-
-
-
 mod block;
 mod errors;
 mod expression;
 mod module;
 mod pattern;
-mod phases;
+pub mod phases; // expose these tools for `library`
 mod procedure;
 mod statement;

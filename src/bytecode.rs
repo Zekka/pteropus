@@ -26,6 +26,8 @@ pub enum Instruction<TLoc, TLab, TInt> {
     Jump(TLab), 
     // jump to s1 if s2 is false
     JumpNo(TLab),
+    // pop s1
+    Pop,
     // return s1
     Ret,
     // call s1
