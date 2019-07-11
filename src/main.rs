@@ -38,6 +38,7 @@ fn main() {
                 ret 2.
             } 
             else if let @dude = dude {
+                eval call print(got(right, answer)).
                 ret r(3, @dude).
             }
             ret 4.
