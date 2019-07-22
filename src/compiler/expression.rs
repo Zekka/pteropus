@@ -1,78 +1,65 @@
-use crate::ast::*;
-use crate::bytecode::*;
-use crate::prim::Functor;
+use crate::interns::Interns;
+use crate::irs::ast1;
+use crate::irs::instruction1;
+use crate::irs::procedure1;
+use crate::primitive::{Functor, Operand};
 
-use super::phases::{PreInterns, PreProcedure};
+use procedure1::Procedure1;
 
-use Instruction::*;
-
-impl Condition {
-    pub fn compile(self, pp: &mut PreProcedure, it: &mut PreInterns, lb_else: LabelIx) {
-        match self {
-            Condition::Let(lhs, rhs) => {
-                pp.push(Mark(lb_else));
-                rhs.compile(pp, it);
-                lhs.compile_destructure(pp, it, true); // unwind on fail, since we are in a conditional situation
-                pp.push(Unmark);
-            }
-            Condition::Bare(xp) => {
-                xp.compile(pp, it);
-                pp.push(JumpNo(lb_else));
-            }
-        }
-    }
-}
+use ast1::{BinOp, Expression};
+use instruction1::Instruction1;
 
 impl Expression {
-    pub fn compile(self, pp: &mut PreProcedure, it: &mut PreInterns) {
-        use Expression::*;
+    pub fn compile(self, it: &mut Interns, pp: &mut Procedure1) {
+        use Instruction1::*;
+        use Expression as E;
         match self {
-            NoOp => {}
+            E::NoOp => {}
 
-            IntLiteral(i) => {
+            E::IntLiteral(i) => {
                 pp.push(Push(Operand::Integer(i)));
             }
-            Variable(n) => {
+            E::Variable(n) => {
                 let loc = pp.local(&n);
                 pp.push(Get(loc));
             }
-            Call(box e) => {
-                e.compile(pp, it);
-                pp.push(Instruction::Call);
+            E::Call(box e) => {
+                e.compile(it, pp);
+                pp.push(Instruction1::Call);
             }
-            Compound(s, mut ve) => {
+            E::Compound(s, mut ve) => {
                 let n = ve.len();
                 for i in ve.drain(..) {
-                    i.compile(pp, it);
+                    i.compile(it, pp);
                 }
-                pp.push(ConstructCompound(Functor(it.to_intern(&s), n)));
+                pp.push(ConstructCompound(Functor(it.intern(&s), n)));
             }
-            Vector(mut ve) => {
+            E::Vector(mut ve) => {
                 let n = ve.len();
                 for i in ve.drain(..) {
-                    i.compile(pp, it);
+                    i.compile(it, pp);
                 }
                 pp.push(ConstructVector(n));
             }
-            Set(mut ve) => {
+            E::Set(mut ve) => {
                 let n = ve.len();
                 for i in ve.drain(..) {
-                    i.compile(pp, it);
+                    i.compile(it, pp);
                 }
                 pp.push(ConstructSet(n));
             }
 
-            Binary(box _lhs, BinOp::And, box _rhs) => {
+            E::Binary(box _lhs, BinOp::And, box _rhs) => {
                 panic!("can't compile And yet");
             }
 
-            Binary(box _lhs, BinOp::Or, box _rhs) => {
+            E::Binary(box _lhs, BinOp::Or, box _rhs) => {
                 panic!("can't compile Or yet");
             }
 
-            Binary(box lhs, op, box rhs) => {
-                lhs.compile(pp, it);
-                rhs.compile(pp, it);
+            E::Binary(box lhs, op, box rhs) => {
+                lhs.compile(it, pp);
+                rhs.compile(it, pp);
                 pp.push(match op {
                     BinOp::And => unreachable!(),
                     BinOp::Or => unreachable!(),

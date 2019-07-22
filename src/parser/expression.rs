@@ -41,7 +41,7 @@ pub fn expression(inp: &str) -> IResult<&str, Expression, Error> {
     };
 }
 
-fn expression_binop<'a>(inp: &'a str) -> IResult<&'a str, BinOp, Error<'a>> {
+fn expression_binop(inp: &str) -> IResult<&str, BinOp, Error> {
     lexeme(alt((
         |inp| { let (inp, _) = tag("*")(inp)?; Ok((inp, BinOp::Multiply)) },
         |inp| { let (inp, _) = tag("/")(inp)?; Ok((inp, BinOp::Divide)) },

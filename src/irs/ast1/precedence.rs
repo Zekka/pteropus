@@ -1,71 +1,8 @@
-#[derive(Debug)]
-pub struct Module {
-    pub procedures: Vec<Procedure>,
-}
-
-#[derive(Debug)]
-pub struct Block(pub Vec<Statement>);
-
-#[derive(Debug)]
-pub struct Procedure {
-    pub name: String,
-    pub args: Vec<Pattern>,
-    pub body: Block,
-}
-
-#[derive(Debug)]
-pub enum Statement {
-    If(Condition, Block, Option<Block>),
-    Assign(String, Expression),
-    Destructure(Pattern, Expression),
-    Eval(Expression),
-    Ret(Expression),
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum BinOp {
-    And, Or, 
-
-    Multiply, Divide,
-    Add, Subtract,
-
-    Le, Ge,
-    Lt, Gt,
-    Eq, Ne,
-}
+use super::types::{BinOp, Expression};
 
 #[derive(Eq, PartialEq)]
-pub enum Associativity {
+enum Associativity {
     Lhs, Rhs
-}
-
-#[derive(Debug)]
-pub enum Pattern {
-    IntLiteral(i64), // TODO: Allow negation as a special case
-    Variable(String),
-    Compound(String, Vec<Pattern>),
-    WcCompound(Vec<Pattern>), // wildcard head 
-    Vector(Vec<Pattern>),
-}
-
-#[derive(Debug)]
-pub enum Condition {
-    Let(Pattern, Expression), 
-    Bare(Expression),
-}
-
-#[derive(Debug)]
-pub enum Expression {
-    NoOp, // Use the thing that's already on top of the stack. FFI
-
-    IntLiteral(i64),
-    Variable(String),
-    Call(Box<Expression>),
-    Compound(String, Vec<Expression>),
-    Vector(Vec<Expression>),
-    Set(Vec<Expression>),
-
-    Binary(Box<Expression>, BinOp, Box<Expression>)
 }
 
 impl Expression {
@@ -82,7 +19,7 @@ impl Expression {
 }
 
 impl BinOp {
-    pub fn precedence(self) -> (u8, Associativity) {
+    fn precedence(self) -> (u8, Associativity) {
         // 0 binds tighter than 1, binds tighter than 2, and so on
         match self {
             BinOp::Multiply => (10, Associativity::Lhs),
@@ -102,7 +39,7 @@ impl BinOp {
         }
     }
 
-    pub fn tighter(self, other: BinOp) -> bool {
+    fn tighter(self, other: BinOp) -> bool {
         let (prec_1, assoc_1) = self.precedence();
         let (prec_2, _assoc_2) = other.precedence();
         // it's assumed (and unchecked) that if prec_1 == prec_2, assoc_1 == assoc_2

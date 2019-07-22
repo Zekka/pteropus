@@ -6,18 +6,17 @@
 #[macro_use]
 extern crate nom;
 
-mod ast;
-mod bytecode;
 mod compiler;
-mod dbgdump;
-mod executable;
+mod errors;
+mod interns;
+mod irs;
 mod library;
 mod parser;
-mod prim;
+mod primitive;
 mod repl;
 mod vm;
 
-fn main() {
+pub fn main() {
     let parsed = parser::parse_module(r##"
     fn main {
         if let scott(@alpha, beta) = scott(alpha, delta) {
@@ -36,36 +35,24 @@ fn main() {
         else if let yes(@dude) = yes(dude) {
             if let @dude = bro {
                 ret 2.
-            } 
+            }
             else if let @dude = dude {
                 eval call print(got(right, answer)).
                 ret r(3, @dude).
             }
             ret 4.
-        } 
+        }
         else {
             ret 5.
         }
     }
     "##); // should return r(3, dude)!!!!
 
-    let compiled = parsed.unwrap().compile(library::Standard);
+    let mut interns = interns::Interns::new(0);
+    let compiled = parsed.unwrap().compile(&mut interns, library::Standard);
 
     let ready_to_run = compiled.unwrap();
 
-    println!("Code: {}", ready_to_run.dump());
-    repl::repl_main(&ready_to_run);
-
-    /*
-    let mut runtime = vm::VM::go(
-        &ready_to_run, 
-        vm::Value::Compound(ready_to_run.to_intern("main").unwrap(), vec![])
-    ).unwrap();
-
-    while runtime.is_running() {
-        runtime.update();
-    }
-
-    println!("Final state: {:?}", runtime);
-    */
+    // println!("Code: {}", ready_to_run.dump());
+    repl::repl_main(&interns, &ready_to_run);
 }

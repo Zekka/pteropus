@@ -1,10 +1,5 @@
-use nom::{
-    error::{VerboseError},
-};
-
-use crate::ast::*;
-
-pub type Error<'a> = VerboseError<&'a str>;
+use crate::irs::ast1::*;
+use crate::errors::parser::*;
 
 mod combinator;
 mod entry_point;

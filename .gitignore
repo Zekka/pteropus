@@ -1,3 +1,5 @@
 /private
 /target
 **/*.rs.bk
+/src.old
+/.idea

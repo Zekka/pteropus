@@ -1,5 +1,8 @@
-use crate::executable;
+use crate::interns::{Intern, Interns};
+use crate::irs::executable1::Executable1;
 use crate::parser::parse_repl_statement;
+use crate::primitive::Value;
+use crate::vm::VM;
 
 use std::collections::HashMap;
 use std::io;
@@ -10,7 +13,7 @@ use std::io::Write;
 // >>> let @wordB = harvoworld.
 // >>> eval call print(w(@wordA, @wordB)).
 // #20(#20, #20)
-pub fn repl_main(loaded: &executable::Module) {
+pub fn repl_main(base_interns: &Interns, loaded: &Executable1) {
     let mut scope = HashMap::new();
 
     loop {
@@ -20,28 +23,24 @@ pub fn repl_main(loaded: &executable::Module) {
         io::stdin().read_line(&mut inp).unwrap();
 
         let parsed = parse_repl_statement(&inp).unwrap();
-        let (vars, code) = parsed.compile_repl(loaded).unwrap();
+        let mut interns = base_interns.extend();
+        let (vars, code) = parsed.compile_repl(&mut interns).unwrap();
         // println!("Vars, code: {:?}", (&vars, &code));
 
-        let mut start = crate::vm::Running {
-            code: loaded,
-            frames: vec![crate::vm::StackFrame::new_on(&code)],
-        };
-        for (k, v) in vars.iter() {
-            start.frames[0].vars[*v] = scope.remove(k);
-        }
-
-        let mut vm = crate::vm::VM::Running(start);
+        let mut vm = VM::start_repl(
+            &code, &loaded,
+            &vars, &mut scope,
+        );
 
         while vm.is_running() {
-            vm.update();
+            vm.update(&interns);
         }
 
         match vm {
             crate::vm::VM::Succeeded(_, mut vmvars) => {
                 for (k, v) in vars.iter() {
-                    let mut extracted: Option<crate::vm::Value> = None;
-                    std::mem::swap(&mut extracted, &mut vmvars[*v]);
+                    let mut extracted: Option<Value> = None;
+                    std::mem::swap(&mut extracted, &mut vmvars[v.0]);
                     if let Some(value) = extracted {
                         scope.insert(k.to_owned(), value);
                     }

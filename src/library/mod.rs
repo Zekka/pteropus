@@ -1,7 +1,6 @@
-use crate::compiler::phases::PreInterns;
-use crate::executable::{FFIProcedure, Module};
-use crate::prim::Functor;
-use crate::vm::Value;
+use crate::interns::{Intern, Interns};
+use crate::irs::executable1::{FFIProcedure, Executable1};
+use crate::primitive::{Functor, Value};
 
 use std::collections::HashMap;
 use std::io;
@@ -10,8 +9,8 @@ use std::io::Write;
 pub trait Library {
     fn add_functions(
         &self,
-        preinterns: &mut PreInterns,
-        procedures: &mut HashMap<Functor<usize>, FFIProcedure>,
+        interns: &mut Interns,
+        procedures: &mut HashMap<Functor<Intern>, FFIProcedure>,
     );
 }
 
@@ -21,20 +20,22 @@ pub struct Standard;
 impl Library for Standard {
     fn add_functions(
         &self,
-        preinterns: &mut PreInterns,
-        procedures: &mut HashMap<Functor<usize>, FFIProcedure>,
+        interns: &mut Interns,
+        procedures: &mut HashMap<Functor<Intern>, FFIProcedure>,
     ) {
-        let ok = preinterns.to_intern("ok").0;
+        let ok = interns.intern("ok");
         procedures.insert(
-            Functor(preinterns.to_intern("print").0, 1), FFIProcedure::Native(box move |module, value| _print(ok, module, value))
+            Functor(interns.intern("print"), 1), FFIProcedure::Native(
+                box move |interns, module, value| _print(ok, interns, module, value)
+            )
         );
     }
 }
 
-fn _print(ok: usize, module: &Module, value: Value) -> Value {
+fn _print(ok: Intern, interns: &Interns, executable: &Executable1, value: Value) -> Value {
     match &value {
         Value::Compound(_, v) if v.len() == 1 => {
-            _really_print(module, &v[0]);
+            _really_print(interns, executable, &v[0]);
             print!("\n");
             io::stdout().flush().unwrap();
         }
@@ -44,12 +45,12 @@ fn _print(ok: usize, module: &Module, value: Value) -> Value {
 }
 
 // TODO: Take interns from an external source too.
-fn _really_print(module: &Module, value: &Value) {
+fn _really_print(interns: &Interns, executable: &Executable1, value: &Value) {
     match value {
         Value::Bool(tf) => print!("{}", tf),
         Value::Compound(x, xs) => {
-            match module.from_intern(*x) {
-                None => print!("#{}", x),
+            match interns.to_string(*x) {
+                None => print!("#{}", x.raw()),
                 Some(s) => print!("{}", s),
             }
             if xs.len() > 0 {
@@ -58,7 +59,7 @@ fn _really_print(module: &Module, value: &Value) {
                     if i > 0 {
                         print!(", ");
                     }
-                    _really_print(module, x);
+                    _really_print(interns, executable, x);
                 }
                 print!(")");
             }
@@ -70,7 +71,7 @@ fn _really_print(module: &Module, value: &Value) {
                 if i > 0 {
                     print!(", ");
                 }
-                _really_print(module, x);
+                _really_print(interns, executable, x);
             }
             print!("]");
         }
@@ -80,7 +81,7 @@ fn _really_print(module: &Module, value: &Value) {
                 if i > 0 {
                     print!(", ");
                 }
-                _really_print(module, x);
+                _really_print(interns, executable, x);
             }
             print!("]");
         }

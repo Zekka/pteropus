@@ -13,7 +13,7 @@ pub fn module(inp: &str) -> IResult<&str, Module, Error> {
     Ok((inp, Module { procedures: res }))
 }
 
-pub fn procedure(inp: &str) -> IResult<&str, crate::ast::Procedure, Error> {
+pub fn procedure(inp: &str) -> IResult<&str, Procedure, Error> {
     let (inp, _) = lexeme_ws(tag("fn"))(inp)?;
     return cut(|inp| {
         let (inp, identifier) = identifier(inp)?;

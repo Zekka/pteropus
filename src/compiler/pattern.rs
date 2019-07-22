@@ -1,49 +1,45 @@
-use crate::ast::*;
-use crate::bytecode::*;
-use crate::prim::Functor;
+use crate::interns::Interns;
+use crate::irs::ast1;
+use crate::irs::instruction1;
+use crate::irs::procedure1;
+use crate::primitive::{Functor, Operand};
 
-use super::phases::{PreInterns, PreProcedure};
-
-use Instruction::*;
+use ast1::Pattern;
+use instruction1::Instruction1;
+use procedure1::Procedure1;
 
 impl Pattern {
-    pub fn compile_destructure(self, pp: &mut PreProcedure, it: &mut PreInterns, unwind_on_fail: bool) {
+    pub fn compile_destructure(self, it: &mut Interns, pp: &mut Procedure1) {
         // there is already a thing on the stack which is the target of the destructure op
+        use Instruction1::*;
+
         match self {
             Pattern::IntLiteral(i) => {
-                pp.push(Push(Operand::Integer(i)));
-                pp.push(Equals);
-                pp.push(if unwind_on_fail { UnwindNo } else { Assert });
+                pp.push(EqualsOperandAssert(Operand::Integer(i)));
             }
             Pattern::Variable(n) => {
                 let loc = pp.local(&n);
-                pp.push(SetOr(loc));
-                pp.push(if unwind_on_fail { UnwindNo } else { Assert });
+                pp.push(SetAssert(loc));
             }
             Pattern::Compound(s, mut v) => {
-                pp.push(DestructCompound(Functor(it.to_intern(&s), v.len())));
-                pp.push(if unwind_on_fail { UnwindNo } else { Assert });
+                pp.push(DestructCompound(Functor(it.intern(&s), v.len())));
 
                 for i in v.drain(..) {
-                    i.compile_destructure(pp, it, unwind_on_fail);
+                    i.compile_destructure(it, pp);
                 }
             }
             Pattern::WcCompound(mut v) => {
                 pp.push(Destruct(v.len()));
-                pp.push(if unwind_on_fail { UnwindNo } else { Assert });
 
                 for i in v.drain(..) {
-                    i.compile_destructure(pp, it, unwind_on_fail);
+                    i.compile_destructure(it, pp);
                 }
             }
             Pattern::Vector(mut v) => {
-                pp.push(IsVec);
-                pp.push(if unwind_on_fail { UnwindNo } else { Assert });
-                pp.push(Destruct(v.len()));
-                pp.push(if unwind_on_fail { UnwindNo } else { Assert });
+                pp.push(DestructVector(v.len()));
 
                 for i in v.drain(..) {
-                    i.compile_destructure(pp, it, unwind_on_fail);
+                    i.compile_destructure(it, pp);
                 }
             }
         }
