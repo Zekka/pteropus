@@ -8,7 +8,6 @@ use crate::irs::instruction2::Instruction2;
 use crate::irs::procedure2::Procedure2;
 use crate::primitive::{Functor, Operand, Value};
 
-use bit_set::BitSet;
 use std::collections::btree_set::BTreeSet;
 use std::iter::FromIterator;
 

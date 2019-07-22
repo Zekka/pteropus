@@ -1,4 +1,4 @@
-use crate::interns::{Intern, Interns};
+use crate::interns::Interns;
 use crate::irs::executable1::Executable1;
 use crate::parser::parse_repl_statement;
 use crate::primitive::Value;
@@ -8,13 +8,9 @@ use std::collections::HashMap;
 use std::io;
 use std::io::Write;
 
-// TODO: When things are in scope, don't reuse interns.
-// >>> let @wordA = helloworld.
-// >>> let @wordB = harvoworld.
-// >>> eval call print(w(@wordA, @wordB)).
-// #20(#20, #20)
 pub fn repl_main(base_interns: &Interns, loaded: &Executable1) {
     let mut scope = HashMap::new();
+    let mut interns = base_interns.extend();
 
     loop {
         print!(">>> ");
@@ -23,7 +19,6 @@ pub fn repl_main(base_interns: &Interns, loaded: &Executable1) {
         io::stdin().read_line(&mut inp).unwrap();
 
         let parsed = parse_repl_statement(&inp).unwrap();
-        let mut interns = base_interns.extend();
         let (vars, code) = parsed.compile_repl(&mut interns).unwrap();
         // println!("Vars, code: {:?}", (&vars, &code));
 
