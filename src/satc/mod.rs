@@ -45,6 +45,15 @@ impl<'bump, A: BumpClone<'bump>> Satc<'bump, A> {
     }
 
     #[inline(always)]
+    pub fn permanent(&mut self) -> &'bump A {
+        let s2 = self.split();
+        match s2 {
+            Satc::Unique(r) => r,
+            Satc::Borrowed(r) => r,
+        }
+    }
+
+    #[inline(always)]
     pub fn as_immut(&self) -> &A {
         match self {
             Satc::Unique(r) => r,

@@ -170,10 +170,10 @@ impl<'bump, 'code> Runner<'bump, 'code> {
 
             DestructCompound(f) => {
                 let mut s1 = self.f[sp].pop()?;
-                match s1.as_mut(bump) {
+                match s1.permanent() {
                     BValue::Compound(intern, args) if intern == &f.0 && args.len() == f.1 => {
-                        for arg in args.drain(..).rev() {
-                            self.f[sp].push(Satc::new(bump.alloc(arg)))
+                        for arg in args.iter().rev() {
+                            self.f[sp].push(Satc::new_borrowed(arg))
                         }
                         Ok(VM::Running(self))
                     }
@@ -182,10 +182,10 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             },
             DestructVector(sz) => {
                 let mut s1 = self.f[sp].pop()?;
-                match s1.as_mut(bump) {
+                match s1.permanent() {
                     BValue::Vector(args) if args.len() == sz => {
-                        for arg in args.drain(..).rev() {
-                            self.f[sp].push(Satc::new(bump.alloc(arg)))
+                        for arg in args.iter().rev() {
+                            self.f[sp].push(Satc::new_borrowed(arg))
                         }
                         Ok(VM::Running(self))
                     }
@@ -194,16 +194,16 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             },
             Destruct(sz) => {
                 let mut s1 = self.f[sp].pop()?;
-                match s1.as_mut(bump) {
+                match s1.permanent() {
                     BValue::Compound(_, args) if args.len() == sz => {
-                        for arg in args.drain(..).rev() {
-                            self.f[sp].push(Satc::new(bump.alloc(arg)));
+                        for arg in args.iter().rev() {
+                            self.f[sp].push(Satc::new_borrowed(arg));
                         }
                         Ok(VM::Running(self))
                     }
                     BValue::Vector(args) if args.len() == sz => {
-                        for arg in args.drain(..).rev() {
-                            self.f[sp].push(Satc::new(bump.alloc(arg)));
+                        for arg in args.iter().rev() {
+                            self.f[sp].push(Satc::new_borrowed(arg));
                         }
                         Ok(VM::Running(self))
                     }
