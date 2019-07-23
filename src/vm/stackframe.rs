@@ -3,17 +3,17 @@ use crate::irs::procedure2::Procedure2;
 use crate::primitive::Value;
 
 #[derive(Debug)]
-pub struct StackFrame<'a> {
+pub struct StackFrame<'code> {
     // code
-    pub c: &'a Procedure2,
+    pub c: &'code Procedure2,
     pub ip: usize,
     // abbreviated to make the runner shorter
     pub v: Vec<Option<Value>>, // vars
     pub s: Vec<Value>, // stack
 }
 
-impl<'a> StackFrame<'a> {
-    pub fn new_on(c: &'a Procedure2) -> StackFrame<'a> {
+impl<'code> StackFrame<'code> {
+    pub fn new_on(c: &'code Procedure2) -> StackFrame<'code> {
         let mut frame = StackFrame {
             c,
             ip: 0,

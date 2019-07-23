@@ -16,17 +16,17 @@ use stackframe::StackFrame;
 
 
 #[derive(Debug)]
-pub enum VM<'a> {
+pub enum VM<'code> {
     Updating,
-    Running(Runner<'a>),
+    Running(Runner<'code>),
     Succeeded(Value, Vec<Option<Value>>), // keep the vars from the frame, to extract in the repl
     Failed(Error),
 }
 
-impl<'a> VM<'a> {
+impl<'code> VM<'code> {
     pub fn start_repl(
-        repl_proc: &'a Procedure2,
-        executable: &'a Executable1,
+        repl_proc: &'code Procedure2,
+        executable: &'code Executable1,
         var_alloc: &HashMap<String, Local>,
         var_value: &mut HashMap<String, Value>,
     ) -> Self {
@@ -40,7 +40,7 @@ impl<'a> VM<'a> {
         VM::Running(runner)
     }
 
-    pub fn go<'proto>(interns: &Interns<'proto>, code: &'a Executable1, call: Value) -> Runtime<Self> {
+    pub fn go<'proto>(interns: &Interns<'proto>, code: &'code Executable1, call: Value) -> Runtime<Self> {
         Runner::new(code).call(interns, call)
     }
 

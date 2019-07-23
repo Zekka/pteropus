@@ -1,0 +1,1 @@
+This is the Bumpalo library, with minor api modifications needed to support the clone behavior I want.

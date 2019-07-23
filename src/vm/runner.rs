@@ -13,20 +13,20 @@ use std::iter::FromIterator;
 
 
 #[derive(Debug)]
-pub struct Runner<'a> {
+pub struct Runner<'code> {
     // code, frames
     // short names for terse implementations
-    pub c: &'a Executable1,
-    pub f: Vec<StackFrame<'a>>,
+    pub c: &'code Executable1,
+    pub f: Vec<StackFrame<'code>>,
 }
 
 
-impl<'a> Runner<'a> {
+impl<'code> Runner<'code> {
     pub fn new(c: &Executable1) -> Runner {
         Runner {c, f: vec![]}
     }
 
-    pub fn call(mut self, interns: &Interns, call: Value) -> Runtime<VM<'a>> {
+    pub fn call(mut self, interns: &Interns, call: Value) -> Runtime<VM<'code>> {
         let c: &Procedure2 = match &call {
             Value::Compound(intern, args) => {
                 match self.c.procedures.get(&Functor(*intern, args.len())) {
@@ -52,7 +52,7 @@ impl<'a> Runner<'a> {
         Ok(VM::Running(self))
     }
 
-    pub fn update(mut self, interns: &Interns) -> Runtime<VM<'a>> {
+    pub fn update(mut self, interns: &Interns) -> Runtime<VM<'code>> {
         let sp = self.f.len() - 1;
         let ip = self.f[sp].ip;
 
@@ -331,7 +331,7 @@ impl<'a> Runner<'a> {
         mut self,
         sp: usize, ip: usize,
         else_ip: usize, keep_on_failure: bool, value: Value
-    ) -> Runtime<VM<'a>> {
+    ) -> Runtime<VM<'code>> {
         // ZEKKA NOTE: Maybe add support for pushes.
 
         // ZEKKA NOTE: This can theoretically be shared between invocations
@@ -514,7 +514,7 @@ impl<'a> Runner<'a> {
         mut self,
         sp: usize, else_ip: usize,
         keep_on_failure: bool, value: Value
-    ) -> Runtime<VM<'a>> {
+    ) -> Runtime<VM<'code>> {
         self.f[sp].ip = else_ip;
         if keep_on_failure {
             self.f[sp].push(value);

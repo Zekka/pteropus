@@ -6,6 +6,8 @@
 #[macro_use]
 extern crate nom;
 
+mod bump;
+mod bumpclone;
 mod compiler;
 mod errors;
 mod interns;
@@ -14,6 +16,7 @@ mod library;
 mod parser;
 mod primitive;
 mod repl;
+mod satc;
 mod vm;
 
 pub fn main() {
