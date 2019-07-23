@@ -49,9 +49,13 @@ pub fn main() {
 
     fn fib_rec(@x) {
         if @x <= 1 {
-            ret 1.
+            let @result = 1.
         }
-        ret fib_rec(@x - 2) + fib_rec(@x - 1).
+        else {
+            let @result = fib_rec(@x - 2) + fib_rec(@x - 1).
+        }
+        print(:log(:fib_rec(@x), :equals, @result)).
+        ret @result.
     }
     "##); // should return r(3, dude)!!!!
 
