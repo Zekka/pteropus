@@ -8,7 +8,7 @@ use nom::{
 use super::*;
 
 pub fn statement(inp: &str) -> IResult<&str, Statement, Error> {
-    alt((statement_let, statement_now, statement_eval, statement_if, statement_ret, statement_call))(inp)
+    alt((statement_let, statement_now, statement_if, statement_ret, statement_call))(inp)
 }
 
 fn statement_now(inp: &str) -> IResult<&str, Statement, Error> {
@@ -32,16 +32,6 @@ fn statement_let(inp: &str) -> IResult<&str, Statement, Error> {
         let (inp, _) = lexeme(tag("."))(inp)?;
 
         Ok((inp, Statement::Destructure(pat, expr)))
-    })(inp)
-}
-
-fn statement_eval(inp: &str) -> IResult<&str, Statement, Error> {
-    let (inp, _) = lexeme_ws(tag("eval"))(inp)?;
-    cut(|inp| {
-        let (inp, expr) = expression(inp)?;
-        let (inp, _) = lexeme(tag("."))(inp)?;
-
-        Ok((inp, Statement::Eval(expr)))
     })(inp)
 }
 
@@ -72,7 +62,7 @@ fn statement_ret(inp: &str) -> IResult<&str, Statement, Error> {
 }
 
 fn statement_call(inp: &str) -> IResult<&str, Statement, Error> {
-    let (inp, expr) = expression_implicit_call(inp)?;
+    let (inp, expr) = expression(inp)?;
     let (inp, _) = lexeme(tag("."))(inp)?;
     Ok((inp, Statement::Eval(expr)))
 }
