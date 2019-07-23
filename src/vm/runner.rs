@@ -71,10 +71,7 @@ impl<'bump, 'code> Runner<'bump, 'code> {
         match self.f[sp].c.instructions[ip] {
             // TODO: Intern integers, bools
             Push(Operand::Integer(i)) => {
-                let bi = BValue::Integer(i);
-                let sbv = Satc::new(bump.alloc(bi));
-
-                self.f[sp].push(sbv);
+                self.f[sp].push(lower_int(bump, i));
                 Ok(VM::Running(self))
             }
 
@@ -288,7 +285,7 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             Mul => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 * i2)))
+                    Num2::Integer(i1, i2) => lower_int(bump, i1 * i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -296,7 +293,7 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             Div => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 / i2)))
+                    Num2::Integer(i1, i2) => lower_int(bump, i1 / i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -304,7 +301,7 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             Add => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 + i2)))
+                    Num2::Integer(i1, i2) => lower_int(bump, i1 + i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -312,7 +309,7 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             Subtract => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 - i2)))
+                    Num2::Integer(i1, i2) => lower_int(bump, i1 - i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -530,6 +527,12 @@ impl<'bump, 'code> Runner<'bump, 'code> {
         }
         Ok(VM::Running(self))
     }
+}
+
+
+#[inline(always)]
+fn lower_int<'bump>(bump: &'bump Bump, i: i64) -> SBV<'bump> {
+    Satc::new(bump.alloc(BValue::Integer(i)))
 }
 
 
