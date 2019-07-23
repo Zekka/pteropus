@@ -7,7 +7,6 @@
 extern crate nom;
 
 mod bump;
-mod bumpclone;
 mod compiler;
 mod errors;
 mod interns;

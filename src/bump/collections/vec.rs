@@ -535,12 +535,12 @@ impl<'bump, T: 'bump> Vec<'bump, T> {
     /// use bumpalo::{Bump, collections::Vec};
     ///
     /// let b = Bump::new();
-    /// let mut vec: Vec<i32> = Vec::new_in(&b);
+    /// let mut vec: Vec<i32> = Vec::new();
     /// ```
     #[inline]
-    pub fn new_in(bump: &'bump Bump) -> Vec<'bump, T> {
+    pub fn new() -> Vec<'bump, T> {
         Vec {
-            buf: RawVec::new_in(bump),
+            buf: RawVec::new(),
             len: 0,
         }
     }
@@ -594,11 +594,11 @@ impl<'bump, T: 'bump> Vec<'bump, T> {
     /// use std::iter;
     ///
     /// let b = Bump::new();
-    /// let v = Vec::from_iter_in(iter::repeat(7).take(3), &b);
+    /// let v = Vec::from_iter_in(&b, iter::repeat(7).take(3));
     /// assert_eq!(v, [7, 7, 7]);
     /// ```
-    pub fn from_iter_in<I: IntoIterator<Item = T>>(iter: I, bump: &'bump Bump) -> Vec<'bump, T> {
-        let mut v = Vec::new_in(bump);
+    pub fn from_iter_in<I: IntoIterator<Item = T>>(bump: &'bump Bump, iter: I) -> Vec<'bump, T> {
+        let mut v = Vec::new();
         v.extend(bump, iter);
         v
     }
@@ -666,10 +666,9 @@ impl<'bump, T: 'bump> Vec<'bump, T> {
         ptr: *mut T,
         length: usize,
         capacity: usize,
-        bump: &'bump Bump,
     ) -> Vec<'bump, T> {
         Vec {
-            buf: RawVec::from_raw_parts_in(ptr, capacity, bump),
+            buf: RawVec::from_raw_parts(ptr, capacity),
             len: length,
         }
     }

@@ -66,7 +66,7 @@ use core::hash;
 use core::iter::FusedIterator;
 use core::mem;
 use core::ops::Bound::{Excluded, Included, Unbounded};
-use core::ops::{self, Add, AddAssign, Index, IndexMut, RangeBounds};
+use core::ops::{self, Index, IndexMut, RangeBounds};
 use core::ptr;
 use crate::bump::Bump;
 
@@ -443,12 +443,12 @@ impl<'bump> String<'bump> {
     ///
     /// let b = Bump::new();
     ///
-    /// let s = String::new_in(&b);
+    /// let s = String::new();
     /// ```
     #[inline]
-    pub fn new_in(bump: &'bump Bump) -> String<'bump> {
+    pub fn new_in() -> String<'bump> {
         String {
-            vec: Vec::new_in(bump),
+            vec: Vec::new(),
         }
     }
 
@@ -637,7 +637,7 @@ impl<'bump> String<'bump> {
             if valid.len() == v.len() {
                 debug_assert!(broken.is_empty());
                 unsafe {
-                    return String::from_utf8_unchecked(Vec::from_iter_in(v.iter().cloned(), bump));
+                    return String::from_utf8_unchecked(Vec::from_iter_in(bump, v.iter().cloned()));
                 }
             }
             (valid, broken)
@@ -731,7 +731,7 @@ impl<'bump> String<'bump> {
     /// assert_eq!(s, "hello");
     /// ```
     pub fn from_iter_in<I: IntoIterator<Item = char>>(iter: I, bump: &'bump Bump) -> String<'bump> {
-        let mut s = String::new_in(bump);
+        let mut s = String::new_in();
         for c in iter {
             s.push(bump, c);
         }
@@ -787,10 +787,9 @@ impl<'bump> String<'bump> {
         buf: *mut u8,
         length: usize,
         capacity: usize,
-        bump: &'bump Bump,
     ) -> String<'bump> {
         String {
-            vec: Vec::from_raw_parts_in(buf, length, capacity, bump),
+            vec: Vec::from_raw_parts_in(buf, length, capacity),
         }
     }
 

@@ -61,7 +61,7 @@ struct PD;
 impl<'a, T> RawVec<'a, T> {
     /// Like `new` but parameterized over the choice of allocator for
     /// the returned RawVec.
-    pub fn new_in(a: &'a Bump) -> Self {
+    pub fn new() -> Self {
         // !0 is usize::MAX. This branch should be stripped at compile time.
         // FIXME(mark-i-m): use this line when `if`s are allowed in `const`
         //let cap = if mem::size_of::<T>() == 0 { !0 } else { 0 };
@@ -125,14 +125,8 @@ impl<'a, T> RawVec<'a, T> {
 }
 
 impl<'a, T> RawVec<'a, T> {
-    /// Reconstitutes a RawVec from a pointer, capacity, and allocator.
-    ///
-    /// # Undefined Behavior
-    ///
-    /// The ptr must be allocated (via the given allocator `a`), and with the given capacity. The
-    /// capacity cannot exceed `isize::MAX` (only a concern on 32-bit systems).
-    /// If the ptr and capacity come from a RawVec created via `a`, then this is guaranteed.
-    pub unsafe fn from_raw_parts_in(ptr: *mut T, cap: usize, a: &'a Bump) -> Self {
+    /// Reconstitutes a RawVec from a pointer and capacity.
+    pub unsafe fn from_raw_parts(ptr: *mut T, cap: usize) -> Self {
         RawVec {
             ptr: NonNull::new_unchecked(ptr),
             cap,
@@ -430,7 +424,7 @@ impl<'a, T> RawVec<'a, T> {
 
             unsafe {
                 self.dealloc_buffer(a);
-                ptr::write(self, RawVec::new_in(a));
+                ptr::write(self, RawVec::new());
             }
         } else if self.cap != amount {
             unsafe {
@@ -574,27 +568,27 @@ mod tests {
     fn reserve_does_not_overallocate() {
         let bump = Bump::new();
         {
-            let mut v: RawVec<u32> = RawVec::new_in(&bump);
+            let mut v: RawVec<u32> = RawVec::new();
             // First `reserve` allocates like `reserve_exact`
-            v.reserve(0, 9);
+            v.reserve(&bump, 0, 9);
             assert_eq!(9, v.cap());
         }
 
         {
-            let mut v: RawVec<u32> = RawVec::new_in(&bump);
-            v.reserve(0, 7);
+            let mut v: RawVec<u32> = RawVec::new();
+            v.reserve(&bump, 0, 7);
             assert_eq!(7, v.cap());
             // 97 if more than double of 7, so `reserve` should work
             // like `reserve_exact`.
-            v.reserve(7, 90);
+            v.reserve(&bump, 7, 90);
             assert_eq!(97, v.cap());
         }
 
         {
-            let mut v: RawVec<u32> = RawVec::new_in(&bump);
-            v.reserve(0, 12);
+            let mut v: RawVec<u32> = RawVec::new();
+            v.reserve(&bump, 0, 12);
             assert_eq!(12, v.cap());
-            v.reserve(12, 3);
+            v.reserve(&bump, 12, 3);
             // 3 is less than half of 12, so `reserve` must grow
             // exponentially. At the time of writing this test grow
             // factor is 2, so new capacity is 24, however, grow factor
