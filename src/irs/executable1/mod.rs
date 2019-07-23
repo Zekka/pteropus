@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use crate::bump::Bump;
 use crate::interns::{Intern, Interns};
 use crate::irs::procedure2::Procedure2;
 use crate::primitive::{Functor, Value};
+use crate::vm::SBV;
 
 use std::fmt;
 
@@ -12,7 +14,7 @@ pub struct Executable1 {
 }
 
 pub enum FFIProcedure {
-    Native(Box<Fn(&Interns, &Executable1, Value) -> Value>),
+    Native(Box<for<'bump> Fn(&'bump Bump, &Interns, &Executable1, SBV<'bump>) -> SBV<'bump>>),
     Dynamic(Procedure2),
 }
 

@@ -10,10 +10,12 @@
 
 use crate::bump::Bump;
 
-use crate::bump::traits::BumpClone;
+use crate::bump::traits::*;
 use std::hint::unreachable_unchecked;
+use std::ops::Deref;
 
-enum Satc<'bump, A: BumpClone<'bump>> {
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum Satc<'bump, A: BumpClone<'bump>> {
     Unique(&'bump mut A),
     Borrowed(&'bump A),
 }
@@ -26,7 +28,7 @@ impl<'bump, A: BumpClone<'bump>> Satc<'bump, A> {
         match self {
             Satc::Unique(r) => *r,
             Satc::Borrowed(r) => {
-                let owned = r.clone(bump);
+                let owned = r.bclone(bump);
                 let mut_ref = bump.alloc(owned);
                 *self = Satc::Unique(mut_ref);
                 unsafe { self.as_mut_unchecked() } // safe: we just set it to Unique
@@ -43,7 +45,7 @@ impl<'bump, A: BumpClone<'bump>> Satc<'bump, A> {
     }
 
     #[inline(always)]
-    pub fn as_immut(&mut self) -> &A {
+    pub fn as_immut(&self) -> &A {
         match self {
             Satc::Unique(r) => r,
             Satc::Borrowed(r) => r,
@@ -71,3 +73,19 @@ impl<'bump, A: BumpClone<'bump>> Satc<'bump, A> {
     }
 }
 
+/*
+impl<'bump, A: BumpSplit<'bump>> BumpSplit<'bump> for Satc<'bump, A> {
+    #[inline(always)]
+    fn bsplit(&mut self, bump: &'bump Bump) -> Satc<'bump, A> {
+        self.split()
+    }
+}
+*/
+
+impl<'bump, A: BumpClone<'bump>> Deref for Satc<'bump, A> {
+    type Target = A;
+
+    fn deref(&self) -> &A {
+        self.as_immut()
+    }
+}

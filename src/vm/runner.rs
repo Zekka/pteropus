@@ -1,40 +1,46 @@
 use super::VM;
 use super::stackframe::*;
 
+use crate::bump::Bump;
+use crate::bump::collections::Vec as BVec;
+use crate::bump::traits::*;
 use crate::errors::runtime::*;
 use crate::interns::Interns;
 use crate::irs::executable1::{Executable1, FFIProcedure};
 use crate::irs::instruction2::Instruction2;
 use crate::irs::procedure2::Procedure2;
-use crate::primitive::{Functor, Operand, Value};
+use crate::primitive::{Functor, Operand};
+use crate::satc::Satc;
+use crate::vm::bvalue::*;
 
 use std::collections::btree_set::BTreeSet;
 use std::iter::FromIterator;
 
 
 #[derive(Debug)]
-pub struct Runner<'code> {
+pub struct Runner<'bump, 'code> {
     // code, frames
     // short names for terse implementations
     pub c: &'code Executable1,
-    pub f: Vec<StackFrame<'code>>,
+    pub f: Vec<StackFrame<'bump, 'code>>,
 }
 
 
-impl<'code> Runner<'code> {
-    pub fn new(c: &Executable1) -> Runner {
+impl<'bump, 'code> Runner<'bump, 'code> {
+    pub fn new(c: &'code Executable1) -> Runner<'bump, 'code> {
         Runner {c, f: vec![]}
     }
 
-    pub fn call(mut self, interns: &Interns, call: Value) -> Runtime<VM<'code>> {
-        let c: &Procedure2 = match &call {
-            Value::Compound(intern, args) => {
+    pub fn call(mut self, bump: &'bump Bump, interns: &Interns, call: SBV<'bump>) -> Runtime<VM<'bump, 'code>> {
+        let c: &Procedure2 = match &call.as_immut() {
+            BValue::Compound(intern, args) => {
                 match self.c.procedures.get(&Functor(*intern, args.len())) {
                     None => { return Err(Error::NoSuchProcedure); }
                     Some(FFIProcedure::Dynamic(c)) => { c }
                     Some(FFIProcedure::Native(native)) => {
                         let sp = self.f.len() - 1;
-                        self.f[sp].push(native(interns, &self.c, call));
+                        let ret = native(bump, interns, &self.c, call);
+                        self.f[sp].push(ret);
 
                         return Ok(VM::Running(self));
                     }
@@ -52,7 +58,7 @@ impl<'code> Runner<'code> {
         Ok(VM::Running(self))
     }
 
-    pub fn update(mut self, interns: &Interns) -> Runtime<VM<'code>> {
+    pub fn update(mut self, bump: &'bump Bump, interns: &Interns) -> Runtime<VM<'bump, 'code>> {
         let sp = self.f.len() - 1;
         let ip = self.f[sp].ip;
 
@@ -61,13 +67,17 @@ impl<'code> Runner<'code> {
 
         use Instruction2::*;
         match self.f[sp].c.instructions[ip] {
+            // TODO: Intern integers, bools
             Push(Operand::Integer(i)) => {
-                self.f[sp].push(Value::Integer(i));
+                let bi = BValue::Integer(i);
+                let sbv = Satc::new(bump.alloc(bi));
+
+                self.f[sp].push(sbv);
                 Ok(VM::Running(self))
             }
 
             Push(Operand::Bool(b)) => {
-                self.f[sp].push(Value::Bool(b));
+                self.f[sp].push(lower_bool(bump, b));
                 Ok(VM::Running(self))
             }
 
@@ -91,9 +101,9 @@ impl<'code> Runner<'code> {
                 }
             }
             Get(vp) => {
-                let to_push = match &self.f[sp].v[vp.0] {
+                let to_push = match &mut self.f[sp].v[vp.0] {
                     None => { return Err(Error::GetUnset) }
-                    Some(x) => { x.clone() }
+                    Some(x) => { x.split() }
                 };
                 self.f[sp].push(to_push);
                 Ok(VM::Running(self))
@@ -101,9 +111,9 @@ impl<'code> Runner<'code> {
 
             Assert => {
                 let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Bool(true) => {},
-                    Value::Bool(false) => { return Err(Error::AssertionFailed); }
+                match s1.as_immut() {
+                    BValue::Bool(true) => {},
+                    BValue::Bool(false) => { return Err(Error::AssertionFailed); }
                     _ => return Err(Error::ConditionalWrongType)
                 }
                 Ok(VM::Running(self))
@@ -114,9 +124,9 @@ impl<'code> Runner<'code> {
             }
             JumpNo(new_ip) => {
                 let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Bool(true) => {},
-                    Value::Bool(false) => {
+                match s1.as_immut() {
+                    BValue::Bool(true) => {},
+                    BValue::Bool(false) => {
                         self.f[sp].ip = new_ip.0;
                     }
                     _ => return Err(Error::ConditionalWrongType)
@@ -133,20 +143,25 @@ impl<'code> Runner<'code> {
                 let top = self.f.pop();
 
                 if self.f.len() == 0 {
-                    return Ok(VM::Succeeded(s1, top.unwrap().v));
+                    return Ok(VM::Succeeded(
+                        BValue::raise(s1.as_immut()),
+                        top.unwrap().v.drain(..).map(
+                            |v| v.map(|x| BValue::raise(x.as_immut()))
+                        ).collect()
+                    ));
                 }
                 self.f[sp - 1].push(s1);
                 Ok(VM::Running(self))
             }
             Call => {
                 let call = self.f[sp].pop()?;
-                self.call(interns, call)
+                self.call(bump, interns, call)
             }
 
             Mark(mark_ip, keep_on_failure) => {
                 let value = self.f[sp].pop()?;
 
-                self.destructure(sp, ip + 1, mark_ip.0, keep_on_failure, value)
+                self.destructure(bump, sp, ip + 1, mark_ip.0, keep_on_failure, value)
             }
 
             Unmark => {
@@ -154,11 +169,11 @@ impl<'code> Runner<'code> {
             }
 
             DestructCompound(f) => {
-                let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Compound(intern, mut args) if intern == f.0 && args.len() == f.1 => {
+                let mut s1 = self.f[sp].pop()?;
+                match s1.as_mut(bump) {
+                    BValue::Compound(intern, args) if intern == &f.0 && args.len() == f.1 => {
                         for arg in args.drain(..).rev() {
-                            self.f[sp].push(arg);
+                            self.f[sp].push(Satc::new(bump.alloc(arg)))
                         }
                         Ok(VM::Running(self))
                     }
@@ -166,11 +181,11 @@ impl<'code> Runner<'code> {
                 }
             },
             DestructVector(sz) => {
-                let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Vector(mut args) if args.len() == sz => {
+                let mut s1 = self.f[sp].pop()?;
+                match s1.as_mut(bump) {
+                    BValue::Vector(args) if args.len() == sz => {
                         for arg in args.drain(..).rev() {
-                            self.f[sp].push(arg);
+                            self.f[sp].push(Satc::new(bump.alloc(arg)))
                         }
                         Ok(VM::Running(self))
                     }
@@ -178,17 +193,17 @@ impl<'code> Runner<'code> {
                 }
             },
             Destruct(sz) => {
-                let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Compound(_, mut args) if args.len() == sz => {
+                let mut s1 = self.f[sp].pop()?;
+                match s1.as_mut(bump) {
+                    BValue::Compound(_, args) if args.len() == sz => {
                         for arg in args.drain(..).rev() {
-                            self.f[sp].push(arg);
+                            self.f[sp].push(Satc::new(bump.alloc(arg)));
                         }
                         Ok(VM::Running(self))
                     }
-                    Value::Vector(mut args) if args.len() == sz => {
+                    BValue::Vector(args) if args.len() == sz => {
                         for arg in args.drain(..).rev() {
-                            self.f[sp].push(arg);
+                            self.f[sp].push(Satc::new(bump.alloc(arg)));
                         }
                         Ok(VM::Running(self))
                     }
@@ -199,36 +214,59 @@ impl<'code> Runner<'code> {
             ConstructCompound(f) => {
                 let len = self.f[sp].s.len();
                 if len < f.1 { return Err(Error::NoMoreValues); }
-                let values = self.f[sp].s.drain((len - f.1)..len).collect::<Vec<Value>>();
-                self.f[sp].push(Value::Compound(f.0, values));
+                let mut values = BVec::with_capacity_in(bump, f.1);
+                for mut i in self.f[sp].s.drain((len - f.1)..len) {
+                    values.push(bump, i.as_mut(bump).clonesume(bump))
+                }
+
+                let bv = BValue::Compound(f.0, values);
+                let sbv = Satc::new(bump.alloc(bv));
+
+                self.f[sp].push(sbv);
                 Ok(VM::Running(self))
             },
             ConstructVector(sz) => {
                 let len = self.f[sp].s.len();
                 if len < sz { return Err(Error::NoMoreValues); }
-                let values = self.f[sp].s.drain((len - sz)..len).collect::<Vec<Value>>();
-                self.f[sp].push(Value::Vector(values));
+                let mut values = BVec::with_capacity_in(bump, sz);
+                for mut i in self.f[sp].s.drain((len - sz)..len) {
+                    values.push(bump, i.as_mut(bump).clonesume(bump))
+                }
+
+                let bv = BValue::Vector(values);
+                let sbv = Satc::new(bump.alloc(bv));
+
+                self.f[sp].push(sbv);
                 Ok(VM::Running(self))
             }
             ConstructSet(sz) => {
                 let len = self.f[sp].s.len();
                 if len < sz { return Err(Error::NoMoreValues); }
-                let values = BTreeSet::from_iter(self.f[sp].s.drain((len - sz)..len));
-                self.f[sp].push(Value::Set(values));
+                panic!("sets cannot be constructed (as I have no bump-allocated set type yet)");
+
+                /*
+                // let values = BTreeSet::from_iter(self.f[sp].s.drain((len - sz)..len));
+                let values = self.f[sp].s.drain((len - sz)..len).collect::<Vec<Value>>();
+                let bv = BValue::Set(values);
+                let sbv = Satc::new(bump.alloc(bi));
+
+                self.f[sp].push(sbv);
                 Ok(VM::Running(self))
+                */
             }
 
             Equals => {
                 let s1 = self.f[sp].pop()?;
                 let s2 = self.f[sp].pop()?;
-                self.f[sp].push(Value::Bool(s1 == s2));
+                self.f[sp].push(lower_bool(bump, s1 == s2));
+
                 Ok(VM::Running(self))
             }
 
             EqualsOperandAssert(Operand::Bool(b)) => {
                 let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Bool(b2) if b == b2 => { }
+                match s1.as_immut() {
+                    BValue::Bool(b2) if &b == b2 => { }
                     // TODO: Better error
                     _ => { return Err(Error::AssertionFailed) }
                 }
@@ -237,8 +275,8 @@ impl<'code> Runner<'code> {
 
             EqualsOperandAssert(Operand::Integer(i)) => {
                 let s1 = self.f[sp].pop()?;
-                match s1 {
-                    Value::Integer(i2) if i == i2 => { }
+                match s1.as_immut() {
+                    BValue::Integer(i2) if &i == i2 => { }
                     // TODO: Better error
                     _ => { return Err(Error::AssertionFailed) }
                 }
@@ -248,7 +286,7 @@ impl<'code> Runner<'code> {
             Mul => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Integer(i1 * i2)
+                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 * i2)))
                 });
                 Ok(VM::Running(self))
             }
@@ -256,7 +294,7 @@ impl<'code> Runner<'code> {
             Div => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Integer(i1 / i2)
+                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 / i2)))
                 });
                 Ok(VM::Running(self))
             }
@@ -264,7 +302,7 @@ impl<'code> Runner<'code> {
             Add => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Integer(i1 + i2)
+                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 + i2)))
                 });
                 Ok(VM::Running(self))
             }
@@ -272,7 +310,7 @@ impl<'code> Runner<'code> {
             Subtract => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Integer(i1 - i2)
+                    Num2::Integer(i1, i2) => Satc::new(bump.alloc(BValue::Integer(i1 - i2)))
                 });
                 Ok(VM::Running(self))
             }
@@ -280,7 +318,7 @@ impl<'code> Runner<'code> {
             Le => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Bool(i1 <= i2)
+                    Num2::Integer(i1, i2) => lower_bool(bump, i1 <= i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -288,7 +326,7 @@ impl<'code> Runner<'code> {
             Ge => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Bool(i1 >= i2)
+                    Num2::Integer(i1, i2) => lower_bool(bump, i1 >= i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -296,7 +334,7 @@ impl<'code> Runner<'code> {
             Lt => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Bool(i1 < i2)
+                    Num2::Integer(i1, i2) => lower_bool(bump, i1 < i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -304,7 +342,7 @@ impl<'code> Runner<'code> {
             Gt => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Bool(i1 > i2)
+                    Num2::Integer(i1, i2) => lower_bool(bump, i1 > i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -312,7 +350,7 @@ impl<'code> Runner<'code> {
             Eq => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Bool(i1 == i2)
+                    Num2::Integer(i1, i2) => lower_bool(bump, i1 == i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -320,7 +358,7 @@ impl<'code> Runner<'code> {
             Ne => {
                 let top = self.f[sp].pop_num2()?;
                 self.f[sp].push(match top {
-                    Num2::Integer(i1, i2) => Value::Bool(i1 != i2)
+                    Num2::Integer(i1, i2) => lower_bool(bump, i1 != i2)
                 });
                 Ok(VM::Running(self))
             }
@@ -329,17 +367,18 @@ impl<'code> Runner<'code> {
 
     fn destructure(
         mut self,
+        bump: &'bump Bump,
         sp: usize, ip: usize,
-        else_ip: usize, keep_on_failure: bool, value: Value
-    ) -> Runtime<VM<'code>> {
+        else_ip: usize, keep_on_failure: bool, value: SBV<'bump>
+    ) -> Runtime<VM<'bump, 'code>> {
         // ZEKKA NOTE: Maybe add support for pushes.
 
         // ZEKKA NOTE: This can theoretically be shared between invocations
         // using set_len() to avoid cleanup/realloc
-        let mut temps: Vec<Option<&Value>> =
+        let mut temps: Vec<Option<&BValue>> =
             Vec::with_capacity(self.f[sp].v.len());
         for _ in 0..self.f[sp].v.len() { temps.push(None); }
-        let mut destructure_stack: Vec<&Value> = Vec::new();
+        let mut destructure_stack: Vec<&BValue> = Vec::new();
         destructure_stack.push(&value);
 
         // Find instructions that set (so we can check single-assignment only once)
@@ -349,7 +388,12 @@ impl<'code> Runner<'code> {
             if seek_ip > self.f[sp].c.instructions.len() { return Err(Error::OutOfCode); }
             match self.f[sp].c.instructions[seek_ip].clone() {
                 Unmark => { break; }
-                SetAssert(l) => { temps[l.0] = self.f[sp].v[l.0].as_ref(); }
+                SetAssert(l) => {
+                    temps[l.0] = match &self.f[sp].v[l.0] {
+                        None => None,
+                        Some(x) => Some(x.as_immut()),
+                    }
+                }
                 Pop => { }
                 DestructCompound(_) => { }
                 DestructVector(_) => { }
@@ -392,7 +436,7 @@ impl<'code> Runner<'code> {
                 DestructCompound(f) => {
                     let s1 = nopt(destructure_stack.pop())?;
                     match s1 {
-                        Value::Compound(intern, args) if intern == &f.0 && args.len() == f.1 => {
+                        BValue::Compound(intern, args) if intern == &f.0 && args.len() == f.1 => {
                             for arg in args.iter().rev() {
                                 destructure_stack.push(&arg);
                             }
@@ -403,7 +447,7 @@ impl<'code> Runner<'code> {
                 DestructVector(sz) => {
                     let s1 = nopt(destructure_stack.pop())?;
                     match s1 {
-                        Value::Vector(args) if args.len() == sz => {
+                        BValue::Vector(args) if args.len() == sz => {
                             for arg in args.iter().rev() {
                                 destructure_stack.push(&arg);
                             }
@@ -414,12 +458,12 @@ impl<'code> Runner<'code> {
                 Destruct(sz) => {
                     let s1 = nopt(destructure_stack.pop())?;
                     match s1 {
-                        Value::Compound(_, args) if args.len() == sz => {
+                        BValue::Compound(_, args) if args.len() == sz => {
                             for arg in args.iter().rev() {
                                 destructure_stack.push(&arg);
                             }
                         }
-                        Value::Vector(args) if args.len() == sz => {
+                        BValue::Vector(args) if args.len() == sz => {
                             for arg in args.iter().rev() {
                                 destructure_stack.push(&arg);
                             }
@@ -430,14 +474,14 @@ impl<'code> Runner<'code> {
                 EqualsOperandAssert(Operand::Bool(b)) => {
                     let s1 = nopt(destructure_stack.pop())?;
                     match s1 {
-                        Value::Bool(b2) if &b == b2 => { }
+                        BValue::Bool(b2) if &b == b2 => { }
                         _ => { return self.destructure_fail(sp, else_ip, keep_on_failure, value) }
                     }
                 }
                 EqualsOperandAssert(Operand::Integer(i)) => {
                     let s1 = nopt(destructure_stack.pop())?;
                     match s1 {
-                        Value::Integer(i2) if &i == i2 => { }
+                        BValue::Integer(i2) if &i == i2 => { }
                         _ => { return self.destructure_fail(sp, else_ip, keep_on_failure, value) }
                     }
                 }
@@ -448,7 +492,7 @@ impl<'code> Runner<'code> {
 
         // Write results
         // All errors will panic here as they succeeded in the previous section
-        let mut write_stack: Vec<Value> = vec![value];
+        let mut write_stack: Vec<SBV<'bump>> = vec![value];
         let mut write_ip = ip;
         loop {
             use Instruction2::*;
@@ -464,38 +508,38 @@ impl<'code> Runner<'code> {
                     write_stack.pop().unwrap();
                 }
                 DestructCompound(_) => {
-                    let s1 = write_stack.pop().unwrap();
-                    match s1 {
-                        Value::Compound(_, mut args) => {
+                    let mut s1 = write_stack.pop().unwrap();
+                    match s1.as_mut(bump) {
+                        BValue::Compound(_, args) => {
                             for arg in args.drain(..).rev() {
-                                write_stack.push(arg);
+                                write_stack.push(Satc::new(bump.alloc(arg)));
                             }
                         }
                         _ => { unreachable!(); }
                     }
                 }
                 DestructVector(_) => {
-                    let s1 = write_stack.pop().unwrap();
-                    match s1 {
-                        Value::Vector(mut args) => {
+                    let mut s1 = write_stack.pop().unwrap();
+                    match s1.as_mut(bump) {
+                        BValue::Vector(args) => {
                             for arg in args.drain(..).rev() {
-                                write_stack.push(arg);
+                                write_stack.push(Satc::new(bump.alloc(arg)));
                             }
                         }
                         _ => { unreachable!(); }
                     }
                 }
                 Destruct(_) => {
-                    let s1 = write_stack.pop().unwrap();
-                    match s1 {
-                        Value::Compound(_, mut args) => {
+                    let mut s1 = write_stack.pop().unwrap();
+                    match s1.as_mut(bump) {
+                        BValue::Compound(_, args) => {
                             for arg in args.drain(..).rev() {
-                                write_stack.push(arg);
+                                write_stack.push(Satc::new(bump.alloc(arg)));
                             }
                         }
-                        Value::Vector(mut args) => {
+                        BValue::Vector(args) => {
                             for arg in args.drain(..).rev() {
-                                write_stack.push(arg);
+                                write_stack.push(Satc::new(bump.alloc(arg)));
                             }
                         }
                         _ => { unreachable!(); }
@@ -513,12 +557,18 @@ impl<'code> Runner<'code> {
     fn destructure_fail(
         mut self,
         sp: usize, else_ip: usize,
-        keep_on_failure: bool, value: Value
-    ) -> Runtime<VM<'code>> {
+        keep_on_failure: bool, value: SBV<'bump>
+    ) -> Runtime<VM<'bump, 'code>> {
         self.f[sp].ip = else_ip;
         if keep_on_failure {
             self.f[sp].push(value);
         }
         Ok(VM::Running(self))
     }
+}
+
+
+#[inline(always)]
+fn lower_bool<'bump>(bump: &'bump Bump, b: bool) -> SBV<'bump> {
+    Satc::new(bump.alloc(BValue::Bool(b)))
 }

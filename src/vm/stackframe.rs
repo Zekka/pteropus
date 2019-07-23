@@ -1,19 +1,20 @@
 use crate::errors::runtime::*;
 use crate::irs::procedure2::Procedure2;
-use crate::primitive::Value;
+
+use crate::vm::bvalue::*;
 
 #[derive(Debug)]
-pub struct StackFrame<'code> {
+pub struct StackFrame<'bump, 'code> {
     // code
     pub c: &'code Procedure2,
     pub ip: usize,
     // abbreviated to make the runner shorter
-    pub v: Vec<Option<Value>>, // vars
-    pub s: Vec<Value>, // stack
+    pub v: Vec<Option<SBV<'bump>>>, // vars
+    pub s: Vec<SBV<'bump>>, // stack
 }
 
-impl<'code> StackFrame<'code> {
-    pub fn new_on(c: &'code Procedure2) -> StackFrame<'code> {
+impl<'bump, 'code> StackFrame<'bump, 'code> {
+    pub fn new_on(c: &'code Procedure2) -> StackFrame<'bump, 'code> {
         let mut frame = StackFrame {
             c,
             ip: 0,
@@ -28,11 +29,11 @@ impl<'code> StackFrame<'code> {
         return frame;
     }
 
-    pub fn push(&mut self, v: Value) {
+    pub fn push(&mut self, v: SBV<'bump>) {
         self.s.push(v)
     }
 
-    pub fn pop(&mut self) -> Runtime<Value> {
+    pub fn pop(&mut self) -> Runtime<SBV<'bump>> {
         match self.s.pop() {
             None => Err(Error::NoMoreValues),
             Some(x) => Ok(x),
@@ -44,16 +45,16 @@ impl<'code> StackFrame<'code> {
             None => Err(Error::NoMoreValues),
             Some(n1) => match self.s.pop() {
                 None => Err(Error::NoMoreValues),
-                Some(n2) => match (n1, n2) {
+                Some(n2) => match (n1.as_immut(), n2.as_immut()) {
                     // RHS is on top
-                    (Value::Integer(i1), Value::Integer(i2)) => Ok(Num2::Integer(i2, i1)),
+                    (BValue::Integer(i1), BValue::Integer(i2)) => Ok(Num2::Integer(*i2, *i1)),
                     _ => Err(Error::NotNumbers)
                 }
             }
         }
     }
 
-    pub fn peek(&self) -> Runtime<&Value> {
+    pub fn peek(&self) -> Runtime<&SBV<'bump>> {
         match self.s.len() {
             0 => Err(Error::NoMoreValues),
             _ => Ok(&self.s[self.s.len() - 1]),

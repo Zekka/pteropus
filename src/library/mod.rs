@@ -1,6 +1,10 @@
+use crate::bump::Bump;
+use crate::bump::collections::Vec as BVec;
 use crate::interns::{Intern, Interns};
 use crate::irs::executable1::{FFIProcedure, Executable1};
 use crate::primitive::{Functor, Value};
+use crate::satc::Satc;
+use crate::vm::{BValue, SBV};
 
 use std::collections::HashMap;
 use std::io;
@@ -26,29 +30,29 @@ impl Library for Standard {
         let ok = interns.intern("ok");
         procedures.insert(
             Functor(interns.intern("print"), 1), FFIProcedure::Native(
-                box move |interns, module, value| _print(ok, interns, module, value)
+                box move |bump, interns, module, sbv| _print(ok, bump, interns, module, sbv)
             )
         );
     }
 }
 
-fn _print(ok: Intern, interns: &Interns, executable: &Executable1, value: Value) -> Value {
-    match &value {
-        Value::Compound(_, v) if v.len() == 1 => {
+fn _print<'bump>(ok: Intern, bump: &'bump Bump, interns: &Interns, executable: &Executable1, value: SBV<'bump>) -> SBV<'bump> {
+    match value.as_immut() {
+        BValue::Compound(_, v) if v.len() == 1 => {
             _really_print(interns, executable, &v[0]);
             print!("\n");
             io::stdout().flush().unwrap();
         }
         _ => unreachable!(),
     }
-    Value::Compound(ok, vec![])
+    Satc::new(bump.alloc(BValue::Compound(ok, BVec::new())))
 }
 
 // TODO: Take interns from an external source too.
-fn _really_print(interns: &Interns, executable: &Executable1, value: &Value) {
+fn _really_print(interns: &Interns, executable: &Executable1, value: &BValue) {
     match value {
-        Value::Bool(tf) => print!("{}", tf),
-        Value::Compound(x, xs) => {
+        BValue::Bool(tf) => print!("{}", tf),
+        BValue::Compound(x, xs) => {
             match interns.to_string(*x) {
                 None => print!("#{}", x.raw()),
                 Some(s) => print!("{}", s),
@@ -64,8 +68,8 @@ fn _really_print(interns: &Interns, executable: &Executable1, value: &Value) {
                 print!(")");
             }
         }
-        Value::Integer(i) => print!("{}", i),
-        Value::Set(xs) => {
+        BValue::Integer(i) => print!("{}", i),
+        BValue::Set(xs) => {
             print!("s[");
             for (i, x) in xs.iter().enumerate() {
                 if i > 0 {
@@ -75,7 +79,7 @@ fn _really_print(interns: &Interns, executable: &Executable1, value: &Value) {
             }
             print!("]");
         }
-        Value::Vector(xs) => {
+        BValue::Vector(xs) => {
             print!("v[");
             for (i, x) in xs.iter().enumerate() {
                 if i > 0 {

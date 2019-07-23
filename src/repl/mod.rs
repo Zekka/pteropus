@@ -1,3 +1,4 @@
+use crate::bump::Bump;
 use crate::interns::Interns;
 use crate::irs::executable1::Executable1;
 use crate::parser::parse_repl_statement;
@@ -20,15 +21,17 @@ pub fn repl_main(base_interns: &Interns, loaded: &Executable1) {
 
         let parsed = parse_repl_statement(&inp).unwrap();
         let (vars, code) = parsed.compile_repl(&mut interns).unwrap();
+        let bump = Bump::new();
         // println!("Vars, code: {:?}", (&vars, &code));
 
         let mut vm = VM::start_repl(
+            &bump,
             &code, &loaded,
             &vars, &mut scope,
         );
 
         while vm.is_running() {
-            vm.update(&interns);
+            vm.update(&bump, &interns);
         }
 
         match vm {

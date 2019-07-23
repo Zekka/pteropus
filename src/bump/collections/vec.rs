@@ -1641,14 +1641,26 @@ impl<'bump, T: 'bump + PartialEq> Vec<'bump, T> {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl<'bump, T: 'bump + BumpClone<'bump>> BumpClone<'bump> for Vec<'bump, T> {
-    fn clone(&self, bump: &'bump Bump) -> Vec<'bump, T> {
+    fn bclone(&self, bump: &'bump Bump) -> Vec<'bump, T> {
         let mut v = Vec::with_capacity_in(bump, self.len());
         for i in self.iter() {
-            v.push(bump, i.clone(bump))
+            v.push(bump, i.bclone(bump))
         }
         v
     }
 }
+
+/*
+impl<'bump, T: 'bump + BumpSplit<'bump>> BumpSplit<'bump> for Vec<'bump, T> {
+    fn bsplit(&mut self, bump: &'bump Bump) -> Vec<'bump, T> {
+        let mut v = Vec::with_capacity_in(bump, self.len());
+        for i in self.iter_mut() {
+            v.push(bump, i.bsplit(bump))
+        }
+        v
+    }
+}
+*/
 
 impl<'bump, T: 'bump + Hash> Hash for Vec<'bump, T> {
     #[inline]
