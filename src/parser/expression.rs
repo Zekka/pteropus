@@ -67,6 +67,8 @@ fn expression_leaf(inp: &str) -> IResult<&str, Expression, Error> {
         expression_vector_literal,
         expression_set_literal,
         expression_compound_literal,
+
+        expression_implicit_call,
     ))(inp)
 }
 
@@ -95,12 +97,14 @@ fn expression_call(inp: &str) -> IResult<&str, Expression, Error> {
 }
 
 fn expression_compound_literal(inp: &str) -> IResult<&str, Expression, Error> {
-    // TODO: Take a generalized string (quotes etc)
-    let (inp, head) = lexeme(identifier)(inp)?;
-    let (inp, oargs) = opt(surrounded("(", ")", multi::separated_nonempty_list(lexeme(tag(",")), expression)))(inp)?;
-    let args = oargs.unwrap_or_else(|| vec![]);
+    let (inp, _) = tag(":")(inp)?;
+    cut(|inp| {
+        let (inp, head) = lexeme(identifier)(inp)?;
+        let (inp, oargs) = opt(surrounded("(", ")", multi::separated_nonempty_list(lexeme(tag(",")), expression)))(inp)?;
+        let args = oargs.unwrap_or_else(|| vec![]);
 
-    Ok((inp, Expression::Compound(head, args)))
+        Ok((inp, Expression::Compound(head, args)))
+    })(inp)
 }
 
 fn expression_vector_literal(inp: &str) -> IResult<&str, Expression, Error> {
@@ -114,3 +118,15 @@ fn expression_set_literal(inp: &str) -> IResult<&str, Expression, Error> {
 
     Ok((inp, Expression::Set(args)))
 }
+
+pub fn expression_implicit_call(inp: &str) -> IResult<&str, Expression, Error> {
+    // copypasted expression_compound_literal body
+    let (inp, head) = lexeme(identifier)(inp)?;
+    cut(move |inp| {
+        let (inp, oargs) = opt(surrounded("(", ")", multi::separated_nonempty_list(lexeme(tag(",")), expression)))(inp)?;
+        let args = oargs.unwrap_or_else(|| vec![]);
+
+        Ok((inp, Expression::Call(box Expression::Compound(head.clone(), args))))
+    })(inp)
+}
+

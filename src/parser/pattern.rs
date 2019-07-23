@@ -36,6 +36,7 @@ fn pattern_variable(inp: &str) -> IResult<&str, Pattern, Error> {
 
 fn pattern_compound_literal(inp: &str) -> IResult<&str, Pattern, Error> {
     // TODO: Take a generalized string (quotes etc)
+    let (inp, _) = tag(":")(inp)?;
     let (inp, head) = lexeme(identifier)(inp)?;
     let (inp, oargs) = opt(surrounded("(", ")", multi::separated_nonempty_list(lexeme(tag(",")), pattern)))(inp)?;
     let args = oargs.unwrap_or_else(|| vec![]);

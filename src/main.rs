@@ -19,26 +19,26 @@ mod vm;
 pub fn main() {
     let parsed = parser::parse_module(r##"
     fn main {
-        if let scott(@alpha, beta) = scott(alpha, delta) {
+        if let :scott(@alpha, :beta) = :scott(:alpha, :delta) {
 
         }
-        eval call print(got(past, first, conditional)).
+        print(:got(:past, :first, :conditional)).
 
-        let @alpha = beta.
-        let @no = no.
-        if let yes = @no {
+        let @alpha = :beta.
+        let @no = :no.
+        if let :yes = @no {
             ret 0.
         }
-        else if let yes(bro) = yes(brah) {
+        else if let :yes(:bro) = :yes(:brah) {
             ret 1.
         }
-        else if let yes(@dude) = yes(dude) {
-            if let @dude = bro {
+        else if let :yes(@dude) = :yes(:dude) {
+            if let @dude = :bro {
                 ret 2.
             }
-            else if let @dude = dude {
-                eval call print(got(right, answer)).
-                ret r(3, @dude).
+            else if let @dude = :dude {
+                print(:got(:right, :answer)).
+                ret :r(3, @dude).
             }
             ret 4.
         }

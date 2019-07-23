@@ -51,7 +51,7 @@ fn _really_print(interns: &Interns, executable: &Executable1, value: &Value) {
         Value::Compound(x, xs) => {
             match interns.to_string(*x) {
                 None => print!("#{}", x.raw()),
-                Some(s) => print!("{}", s),
+                Some(s) => print!(":{}", s),
             }
             if xs.len() > 0 {
                 print!("(");
