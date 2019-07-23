@@ -11,11 +11,11 @@
 use crate::bump::Bump;
 
 use crate::bump::traits::BumpClone;
+use std::hint::unreachable_unchecked;
 
 enum Satc<'bump, A: BumpClone<'bump>> {
     Unique(&'bump mut A),
     Borrowed(&'bump A),
-    InProcess,
 }
 
 impl<'bump, A: BumpClone<'bump>> Satc<'bump, A> {
@@ -29,27 +29,45 @@ impl<'bump, A: BumpClone<'bump>> Satc<'bump, A> {
                 let owned = r.clone(bump);
                 let mut_ref = bump.alloc(owned);
                 *self = Satc::Unique(mut_ref);
-                return self.as_mut(bump);
+                unsafe { self.as_mut_unchecked() } // safe: we just set it to Unique
             }
-            Satc::InProcess => unreachable!()
         }
     }
 
-    pub fn split(&'bump mut self) -> Satc<'bump, A> {
-        let mut swapzone = Satc::InProcess;
-        std::mem::swap(self, &mut swapzone);
+    #[inline(always)]
+    unsafe fn as_mut_unchecked(&mut self) -> &mut A {
+        match self {
+            Satc::Unique(r) => *r,
+            _ => unreachable_unchecked()
+        }
+    }
 
-        let (s1, s2) = match swapzone {
-            Satc::Unique(r) => {
-                (Satc::Borrowed(r), Satc::Borrowed(r))
-            }
-            Satc::Borrowed(r) => {
-                (Satc::Borrowed(r), Satc::Borrowed(r))
-            }
-            Satc::InProcess => unreachable!()
-        };
-        *self = s1;
-        return s2;
+    #[inline(always)]
+    pub fn as_immut(&mut self) -> &A {
+        match self {
+            Satc::Unique(r) => r,
+            Satc::Borrowed(r) => r,
+        }
+    }
+
+    #[inline(always)]
+    fn safe_split(self) -> (Satc<'bump, A>, Satc<'bump, A>) {
+        match self {
+            Satc::Unique(r) => { (Satc::Borrowed(r), Satc::Borrowed(r)) }
+            Satc::Borrowed(r) => { (Satc::Borrowed(r), Satc::Borrowed(r)) }
+        }
+    }
+
+    #[inline(always)]
+    pub fn split(&mut self) -> Satc<'bump, A> {
+        // safety: you can't get s1 or s2, which would duplicate the mut ref,
+        // unless this function returns, after which `self` has been overwritten
+        unsafe {
+            let old_self = std::ptr::read(self);
+            let (s1, s2) = old_self.safe_split();
+            std::ptr::write(self, s1);
+            s2
+        }
     }
 }
 

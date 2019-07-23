@@ -750,6 +750,7 @@ unsafe impl<'a> alloc::Alloc for &'a Bump {
         // Note that we align-up the bump pointer on new allocation requests
         // (not eagerly) so if `ptr` was the result of our last allocation, then
         // the bump pointer is still pointing just after it.
+
         let footer = self.current_chunk_footer.get();
         let footer = footer.as_ref();
         let footer_ptr = footer.ptr.get().as_ptr() as usize;
