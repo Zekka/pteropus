@@ -10,6 +10,8 @@ pub enum BValue<'bump> {
     Integer(i64),
     Bool(bool),
 
+    // TODO: Add &'bump to all internal bvalue pointers (treat them as already-shared vals instead of owned vals)
+    // We don't have any nested bval accessors anyway
     Compound(Intern, BVec<'bump, BValue<'bump>>),
     Vector(BVec<'bump, BValue<'bump>>),
     Set(BVec<'bump, BValue<'bump>>),
