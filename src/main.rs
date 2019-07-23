@@ -46,6 +46,13 @@ pub fn main() {
             ret 5.
         }
     }
+
+    fn fib_rec(@x) {
+        if @x <= 1 {
+            ret 1.
+        }
+        ret fib_rec(@x - 2) + fib_rec(@x - 1).
+    }
     "##); // should return r(3, dude)!!!!
 
     let mut interns = interns::Interns::new(0);
