@@ -16,6 +16,8 @@ use crate::vm::bvalue::*;
 use std::collections::btree_set::BTreeSet;
 use std::iter::FromIterator;
 
+use bit_set::BitSet;
+
 
 #[derive(Debug)]
 pub struct Runner<'bump, 'code> {
@@ -375,9 +377,15 @@ impl<'bump, 'code> Runner<'bump, 'code> {
 
         // ZEKKA NOTE: This can theoretically be shared between invocations
         // using set_len() to avoid cleanup/realloc
+        let mut touched = BitSet::with_capacity(self.f[sp].v.len());
         let mut temps: Vec<Option<&BValue>> =
             Vec::with_capacity(self.f[sp].v.len());
-        for _ in 0..self.f[sp].v.len() { temps.push(None); }
+        let mut temps2: Vec<Option<&'bump mut BValue>> = // temps2 is just here to avoid using a variable after moving (it holds intermediate cloned results from temps)
+            Vec::with_capacity(self.f[sp].v.len());
+        for _ in 0..self.f[sp].v.len() {
+            temps.push(None);
+            temps2.push(None);
+        }
         let mut destructure_stack: Vec<&BValue> = Vec::new();
         destructure_stack.push(&value);
 
@@ -423,7 +431,10 @@ impl<'bump, 'code> Runner<'bump, 'code> {
                 SetAssert(l) => {
                     let s1 = nopt(destructure_stack.pop())?;
                     match temps[l.0] {
-                        None => temps[l.0] = Some(s1),
+                        None => {
+                            touched.insert(l.0);
+                            temps[l.0] = Some(s1)
+                        },
                         Some(x) => {
                             if x != s1 { return self.destructure_fail(sp, else_ip, keep_on_failure, value); }
                             // continue
@@ -490,68 +501,22 @@ impl<'bump, 'code> Runner<'bump, 'code> {
             destructure_ip += 1;
         };
 
-        // Write results
-        // All errors will panic here as they succeeded in the previous section
-        let mut write_stack: Vec<SBV<'bump>> = vec![value];
-        let mut write_ip = ip;
-        loop {
-            use Instruction2::*;
-            match self.f[sp].c.instructions[write_ip].clone() {
-                Unmark => {
-                    self.f[sp].ip = write_ip + 1;
-                    return Ok(VM::Running(self));
-                }
-                SetAssert(l) => {
-                    self.f[sp].v[l.0] = Some(write_stack.pop().unwrap());
-                }
-                Pop => {
-                    write_stack.pop().unwrap();
-                }
-                DestructCompound(_) => {
-                    let mut s1 = write_stack.pop().unwrap();
-                    match s1.as_mut(bump) {
-                        BValue::Compound(_, args) => {
-                            for arg in args.drain(..).rev() {
-                                write_stack.push(Satc::new(bump.alloc(arg)));
-                            }
-                        }
-                        _ => { unreachable!(); }
-                    }
-                }
-                DestructVector(_) => {
-                    let mut s1 = write_stack.pop().unwrap();
-                    match s1.as_mut(bump) {
-                        BValue::Vector(args) => {
-                            for arg in args.drain(..).rev() {
-                                write_stack.push(Satc::new(bump.alloc(arg)));
-                            }
-                        }
-                        _ => { unreachable!(); }
-                    }
-                }
-                Destruct(_) => {
-                    let mut s1 = write_stack.pop().unwrap();
-                    match s1.as_mut(bump) {
-                        BValue::Compound(_, args) => {
-                            for arg in args.drain(..).rev() {
-                                write_stack.push(Satc::new(bump.alloc(arg)));
-                            }
-                        }
-                        BValue::Vector(args) => {
-                            for arg in args.drain(..).rev() {
-                                write_stack.push(Satc::new(bump.alloc(arg)));
-                            }
-                        }
-                        _ => { unreachable!(); }
-                    }
-                }
-                EqualsOperandAssert(_) => {
-                    write_stack.pop().unwrap();
-                }
-                _ => { unreachable!() }
-            }
-            write_ip += 1;
+
+        // Clone results prior to writing
+        for i in touched.iter() {
+            temps2[i] = Some(bump.alloc(temps[i].unwrap().bclone(bump)))
         }
+
+        // Write results
+        for i in touched.iter() {
+            let mut tmp = None;
+            std::mem::swap(&mut temps2[i], &mut tmp);
+            self.f[sp].v[i] = Some(Satc::new(tmp.unwrap()))
+        }
+
+        // Done!
+        self.f[sp].ip = destructure_ip + 1;
+        return Ok(VM::Running(self));
     }
 
     fn destructure_fail(
